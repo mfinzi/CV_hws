@@ -12,7 +12,8 @@ def convolution(img, kernel, padding='fill'):
     """
     h,w = kernel.shape[:2]
     t,b,l,r = (h-1)//2, h//2, (w-1)//2, w//2
-    padded_img = utils.pad_image(img, t,b,l,r, padding='fill')
+    padding = [(t,b),(l,r)]+[(0,0)]*(len(img.shape)-2)
+    padded_img = np.pad(img, padding,mode='constant')
     conved_img = np.zeros_like(img)
     for i in 1+np.arange(-h//2,h//2):
         for j in 1+np.arange(-w//2,w//2):
