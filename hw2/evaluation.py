@@ -5,7 +5,18 @@ from train_clf import resume_model
 import tqdm
 import scipy.linalg as la
 import utils
+from scipy.stats import entropy
+from scipy.linalg import norm,sqrtm
 
+def get_logits(imgs,model,bs=32):
+    """ Extracts logits from a model, imgs should be numpy array (N, C, W, H),
+        and model is the pytorch module on the gpu, returns a numpy array (N, K)
+        where K is the number of classes"""
+    N,C,W,H = imgs.shape
+    mb_images = imgs.reshape(N//bs,bs,C,W,H)
+    get_logits = lambda mb: model(torch.from_numpy(mb).cuda()).cpu().data.numpy()
+    logits = np.concatenate([get_logits(minibatch) for minibatch in mb_images],axis=0)
+    return logits
 
 def IS(gen_imgs, model, args):
     """ Compute the Inception Score using [model] to replace the inception model
@@ -18,8 +29,12 @@ def IS(gen_imgs, model, args):
     Rets:
         [score]     float, the inception score.
     """
-    raise NotImplementedError()
-
+    # E_z[KL(Pyz||Py)] = \mean_z [\sum_y (Pyz log(Pyz) - Pyz log(Py))]
+    logits = get_logits(gen_imgs,model)
+    Pyz = np.exp(logits).transpose() # Take softmax (up to a normalization constant)
+    Py = Pyz.mean(-1)                # Average over z
+    logIS = entropy(Pyz,Py).mean()   # Average over z
+    raise np.exp(logIS)
 
 def FID(gen_imgs, gtr_imgs, feat_extr, args, eps=1e-8):
     """ Compute FID scores for [gen_imgs] using [gtr_imgs] as ground truth and
@@ -33,7 +48,16 @@ def FID(gen_imgs, gtr_imgs, feat_extr, args, eps=1e-8):
     Rets:
         [score]     float, the FID score.
     """
-    raise NotImplementedError()
+    gen_logits = get_logits(gen_imgs,feat_extr)
+    gtr_logits = get_logits(gtr_imgs,feat_extr)
+    mu1 = np.mean(gen_logits,axis=0)
+    sigma1 = np.cov(gen_logits, rowvar=False)
+    mu2 = np.mean(gtr_logits,axis=0)
+    sigma2 = np.cov(gtr_logits, rowvar=False)
+
+    tr = np.trace(sigma1 + sigma2 - 2*sqrtm(sigma1@sigma2))
+    distance = norm(mu1-mu2)**2 + tr
+    return distance
 
 
 ############################################################
