@@ -61,10 +61,16 @@ class Encoder(nn.Module):
 			nn.ReLU()
 			)
 
-		self.layer5 = nn.Linear(args.nef*8, args.nz)
+		self.layer5 = nn.Linear(args.nef*8*4, args.nz)
 
 	def forward(self, x):
-		return self.layer5(self.layer4(self.layer3(self.layer2(self.layer1(x)))))
+		x = self.layer1(x)
+		x = self.layer2(x)
+		x = self.layer3(x)
+		x = self.layer4(x)
+		print (x.size())
+		x = self.layer5(x)
+		return x
 
 
 	def load_model(self, filename):
@@ -136,7 +142,7 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 		[loss]  (float) Reconstruction loss of the batch (before the update).
 	"""
 	
-	en_res = encoder(input_data)
+	en_res = encoder(input_data[0])
 	de_res = decoder(en_res)
 	enc_opt.zero_grad()
 	dec_opt.zero_grad()
