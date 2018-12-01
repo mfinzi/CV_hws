@@ -143,6 +143,7 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 	enc_opt.step()
 	dec_opt.step()
 
+	return recon_loss(de_res, input_data)
 
 def sample(model, n, sampler, args):
 	""" Sample [n] images from [model] using noise created by the sampler.
@@ -153,7 +154,13 @@ def sample(model, n, sampler, args):
 	Rets:
 		[imgs]      (B, C, W, H) Float, numpy array.
 	"""
-	raise NotImplementedError()
+	images = np.zeros((n))
+
+	for i in range(n):
+		curr_sample = sampler()
+		images[i] = model(curr_sample)
+
+	return images
 
 
 ############################################################
