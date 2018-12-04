@@ -61,9 +61,10 @@ class Encoder(nn.Module):
 			nn.ReLU()
 			)
 
-		self.layer5 = nn.Linear(args.nef*8*4, args.nz)
+		self.layer5 = nn.Linear(args.nef*8, args.nz)
 
 	def forward(self, x):
+		print (x.size())
 		x = self.layer1(x)
 		x = self.layer2(x)
 		x = self.layer3(x)
@@ -96,15 +97,15 @@ class Decoder(nn.Module):
 			nn.Linear(args.nz, args.ngf*4*4),
 			nn.ReLU(),
 
-			nn.Conv2d(in_channels=args.ngf*4, out_channels=args.ngf*2, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
+			nn.ConvTranspose2d(in_channels=args.ngf*4, out_channels=args.ngf*2, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
 			nn.BatchNorm2d(args.ngf*2),
 			nn.ReLU(),
 
-			nn.Conv2d(in_channels=args.ngf*2, out_channels=args.ngf, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
+			nn.ConvTranspose2d(in_channels=args.ngf*2, out_channels=args.ngf, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
 			nn.BatchNorm2d(args.ngf),
 			nn.ReLU(),
 
-			nn.Conv2d(in_channels=args.ngf, out_channels=args.nc, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
+			nn.ConvTranspose2d(in_channels=args.ngf, out_channels=args.nc, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
 			nn.Tanh()
 			)
 
