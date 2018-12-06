@@ -19,7 +19,7 @@ def recon_loss(g_out, labels, args):
 		Reconstruction loss with both L1 and L2.
 	"""
 	lam1 = args.recon_l1_weight
-	lam2 = arg.recon_l2_weight
+	lam2 = args.recon_l2_weight
 
 	fst_term = lam2*np.power((g_out - labels), 2)
 	snd_term = lam1*np.absolute(g_out - labels)
@@ -61,7 +61,7 @@ class Encoder(nn.Module):
 			nn.ReLU()
 			)
 
-		self.layer5 = nn.Linear(args.nef*8, args.nz)
+		self.layer5 = nn.Linear(args.nef*8*2*2, args.nz)
 
 	def forward(self, x):
 		print (x.size())
@@ -70,6 +70,7 @@ class Encoder(nn.Module):
 		x = self.layer3(x)
 		x = self.layer4(x)
 		print (x.size())
+		x = x.view(x.size(0), -1)
 		x = self.layer5(x)
 		return x
 
@@ -92,10 +93,15 @@ class Decoder(nn.Module):
 
 	def __init__(self, args):
 		super(Decoder, self).__init__()
-		self.decoder_layers = nn.Sequential(
-			nn.BatchNorm1d(args.nz),
-			nn.Linear(args.nz, args.ngf*4*4),
+		self.decoder_fc = nn.Sequential(
+			nn.Linear(args.nz, args.ngf*4),
+			nn.BatchNorm1d(args.ngf*4),
 			nn.ReLU(),
+			
+		)
+		self.reshape_num = args.ngf 
+
+		self.decoder_conv_layers = nn.Sequential(
 
 			nn.ConvTranspose2d(in_channels=args.ngf*4, out_channels=args.ngf*2, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
 			nn.BatchNorm2d(args.ngf*2),
@@ -112,7 +118,10 @@ class Decoder(nn.Module):
 
 
 	def forward(self, z, c=None):
-		return self.decoder_layers(z)
+		x = self.decoder_fc(z)
+		x = x.view(-1,self.reshape_num*4,4,4)
+		x = self.decoder_conv_layers(x)
+		return x
 
 
 	def load_model(self, filename):
@@ -150,7 +159,7 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 	enc_opt.step()
 	dec_opt.step()
 
-	return recon_loss(de_res, input_data)
+	return recon_loss(de_res, input_data, args)
 
 def sample(model, n, sampler, args):
 	""" Sample [n] images from [model] using noise created by the sampler.
