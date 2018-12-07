@@ -28,7 +28,7 @@ def gaussian_kernel(k=3,sigma=.3):
     kernel = np.exp(-(x**2 +y**2)/(2*sigma**2))
     return kernel/kernel.sum()
 
-Dx = lambda: np.array([[1/2,0,-1/2]])
+Dx = lambda: np.array([[1,0,-1]])
 Dy = lambda: Dx().T
 
 def convolve(*args,**kwargs):
@@ -53,12 +53,12 @@ def compute_Harris_response(img, patchsize, ksize=3, sigma=0.1, epsilon=1e-6):
     Rets:
         Shape HxW, matrix of response, where response is det/(trace+1e-6)
     """
-    img = convolve(img,gaussian_kernel(ksize,np.sqrt(sigma)))
+    img = convolve(img,gaussian_kernel(ksize,sigma))
     g_x, g_y = convolve(img,Dx()), convolve(img,Dy())
     g = np.stack([g_x,g_y],axis=-1)
 
     gg_T = g[...,None,:]*g[...,:,None]
-    avg_filter = np.ones((patchsize,patchsize))/patchsize**2
+    avg_filter = np.ones((patchsize,patchsize))
     M = convolve(gg_T, avg_filter)
 
     det = M[...,0,0]*M[...,1,1] - M[...,0,1]*M[...,1,0]
