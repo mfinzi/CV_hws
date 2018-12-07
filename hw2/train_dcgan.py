@@ -52,7 +52,7 @@ class Generator(nn.Module):
         self.ngf = args.ngf
 
         self.proj = nn.Linear(args.nz, 4 * args.ngf * 4 * 4)
-        self.bn0 = nn.BatchNorm2d(4 * args.ngf * 4 * 4)
+        self.bn0 = nn.BatchNorm1d(4 * args.ngf * 4 * 4)
 
         self.dconv1 = nn.ConvTranspose2d(4 * args.ngf, args.ngf * 2, 4, 2, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(args.ngf * 2)
@@ -64,7 +64,7 @@ class Generator(nn.Module):
 
     def forward(self, z, c=None):
         out = F.relu(self.bn0(self.proj(z)))
-        out = out.view(4 * args.ngf, 4, 4)
+        out = out.view(-1, 4 * args.ngf, 4, 4)
         out = F.relu(self.bn1(self.dconv1(out)))
         out = F.relu(self.bn2(self.dconv2(out)))
         out = F.tanh(self.dconv3(out))
@@ -137,17 +137,18 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    g_loss(dfake, dreal)
-    g_loss.backward()
+    loss_g = g_loss(dfake, dreal)
+    loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    d_loss(dfake, dreal)
-    d_loss.backward()
+    loss_d = d_loss(dfake, dreal)
+    loss_d.backward()
     d_opt.step()
 
+    return loss_d, loss_g
 def sample(model, n, sampler, args):
     """ Sample [n] images from [model] using noise created by the sampler.
     Args:
