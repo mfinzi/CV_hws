@@ -39,12 +39,28 @@ class Generator(nn.Module):
 
     def __init__(self, args):
         super(Generator, self).__init__()
-        raise NotImplementedError()
+        self.ngf = args.ngf
 
+        self.fc = nn.Linear(args.nz, 4 * args.ngf * 4 * 4)
+        self.fc_bn = nn.BatchNorm2d(4 * args.ngf * 4 * 4)
+
+        self.up_conv1 = nn.ConvTranspose2d(4 * args.ngf, args.ngf * 2, 4, 2, 1, bias=False)
+        self.up_conv1_nb = nn.BatchNorm2d(args.ngf * 2)
+
+        self.up_conv2 = nn.ConvTranspose2d(args.ngf * 2, args.ngf, 4, 2, 1, bias=False)
+        self.up_conv2_nb = nn.BatchNorm2d(args.ngf)
+
+        self.upconv3 = nn.ConvTranspose2d(args.ngf, args.nc, 4, 2, 1, bias=False)
+        self.up_conv3_nb = nn.BatchNorm2d(args.nc)
 
     def forward(self, z, c=None):
-        raise NotImplementedError()
+        out = F.relu(self.fc_bn(self.fc(z)))
+        out = out.view(4 * args.ngf, 4, 4)
+        out = F.relu(self.up_conv1_nb(self.up_conv1(out)))
+        out = F.relu(self.up_conv2_nb(self.up_conv2(out)))
+        out = F.tanh(self.up_conv3_nb(self.up_conv3(out)))
 
+        return out
 
     def load_model(self, filename):
         """ Load the pretrained weights stored in file [filename] into the model.
