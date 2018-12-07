@@ -84,6 +84,7 @@ def evaluate(clf, loader, args):
     'loss' : 0,
     'acc' : 0
     }
+    clf.eval()
 
     criterion = nn.CrossEntropyLoss()
     ncorrect = 0.
@@ -109,7 +110,7 @@ def evaluate(clf, loader, args):
     res_dict['loss'] = res_dict['loss']/n
     res_dict['loss'] = res_dict['loss'][0].item()
     res_dict['acc'] = ncorrect/n
-
+    clf.train()
     return res_dict
 
 def resume_model(filename, args):
