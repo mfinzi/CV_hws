@@ -95,7 +95,8 @@ def d_loss(dreal, dfake):
     Rets:
         DCGAN loss for Discriminator.
     """
-    raise NotImplementedError()
+
+    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
 
 
 def g_loss(dreal, dfake):
@@ -108,7 +109,7 @@ def g_loss(dreal, dfake):
     Rets:
         DCGAN loss for Generator.
     """
-    raise NotImplementedError()
+    return - torch.mean(torch.log(dfake), dim=0)
 
 
 def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=None):
@@ -126,8 +127,26 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
         [L_d]   (float) Discriminator loss (before discriminator's update step).
         [L_g]   (float) Generator loss (before generator's update step)
     """
-    raise NotImplementedError()
+    if args.cuda:
+        input_data[0] = input_data[0].cuda()
+        input_data[1] = input_data[1].cuda()
 
+    g_opt.zero_grad()
+    d_opt.zero_grad()
+
+    input_fake = sampler()
+    dfake = d_net(g_net(input_fake))
+    dreal = d_net(input_data[0])
+    g_loss(dfake, dreal)
+    g_loss.backward()
+    g_opt.step()
+
+    input_fake = sampler()
+    dfake = d_net(g_net(input_fake))
+    dreal = d_net(input_data[0])
+    d_loss(dfake, dreal)
+    d_loss.backward()
+    d_opt.step()
 
 def sample(model, n, sampler, args):
     """ Sample [n] images from [model] using noise created by the sampler.
@@ -138,7 +157,26 @@ def sample(model, n, sampler, args):
     Rets:
         [imgs]      (B, C, W, H) Float, numpy array.
     """
-    raise NotImplementedError()
+    images = np.zeros((n, args.nc, args.image_size, args.image_size))
+
+    completed = 0
+
+    while completed < n:
+
+        curr_sample = sampler()
+
+        results = model(curr_sample)
+
+        temp_completed = completed + args.batch_size
+
+        if temp_completed <= n:
+            images[completed : temp_completed] = results.detach().cpu().numpy()
+        else:
+            diff = n - completed
+            images[completed:] = results[:diff].detach().cpu().numpy()
+        completed += args.batch_size
+
+    return images
 
 
 ############################################################
@@ -185,5 +223,3 @@ if __name__ == "__main__":
 
     gen_img = sample(g_net, 60000, get_z, args)
     np.save('dcgan_out.npy', gen_img)
-
-
