@@ -18,6 +18,12 @@ def recon_loss(g_out, labels, args):
 	Rets:
 		Reconstruction loss with both L1 and L2.
 	"""
+	print ("In recon loss")
+	print (g_out)
+	print (g_out.size())
+	print (labels)
+	print (labels.size())
+
 	lam1 = args.recon_l1_weight
 	lam2 = args.recon_l2_weight
 
@@ -64,12 +70,10 @@ class Encoder(nn.Module):
 		self.layer5 = nn.Linear(args.nef*8*2*2, args.nz)
 
 	def forward(self, x):
-		print (x.size())
 		x = self.layer1(x)
 		x = self.layer2(x)
 		x = self.layer3(x)
 		x = self.layer4(x)
-		print (x.size())
 		x = x.view(x.size(0), -1)
 		x = self.layer5(x)
 		return x
@@ -85,7 +89,9 @@ class Encoder(nn.Module):
 			enet.load_model('autoencoder.pth.tar')
 			# Here [enet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
-		self.load_state_dict(torch.load(filename))
+		checkpoint = torch.load(filename)
+		print (checkpoint.keys())
+		self.load_state_dict(checkpoint['encoder'])
 
 
 
@@ -134,7 +140,11 @@ class Decoder(nn.Module):
 			dnet.load_model('autoencoder.pth.tar')
 			# Here [dnet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
-		self.load_state_dict(torch.load(filename))
+		checkpoint = torch.load(filename)
+		print (checkpoint.keys())
+
+		self.load_state_dict(checkpoint['decoder'])
+
 
 
 def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=None):
@@ -151,7 +161,7 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 	Rets:
 		[loss]  (float) Reconstruction loss of the batch (before the update).
 	"""
-	
+
 	en_res = encoder(input_data[0])
 	de_res = decoder(en_res)
 	enc_opt.zero_grad()
@@ -159,7 +169,9 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 	enc_opt.step()
 	dec_opt.step()
 
-	return recon_loss(de_res, input_data, args)
+	loss  = recon_loss(de_res, input_data[0], args)
+
+	return loss
 
 def sample(model, n, sampler, args):
 	""" Sample [n] images from [model] using noise created by the sampler.
@@ -189,6 +201,11 @@ if __name__ == "__main__":
 
 	decoder = Decoder(args)
 	encoder = Encoder(args)
+
+	encoder.load_model('autoencoder.pth.tar')
+	decoder.load_model('autoencoder.pth.tar')
+
+
 	if args.cuda:
 		decoder = decoder.cuda()
 		encoder = encoder.cuda()
