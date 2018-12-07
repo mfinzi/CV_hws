@@ -14,8 +14,8 @@ def get_logits(imgs,model,bs=32):
         where K is the number of classes"""
     N,C,W,H = imgs.shape
     mb_images = imgs.reshape(N//bs,bs,C,W,H)
-    get_logits = lambda mb: model(torch.from_numpy(mb).cuda()).cpu().data.numpy()
-    logits = np.concatenate([get_logits(minibatch) for minibatch in mb_images],axis=0)
+    get_logits_t = lambda mb: model(torch.from_numpy(mb).float().cuda()).cpu().data.numpy()
+    logits = np.concatenate([get_logits_t(minibatch) for minibatch in mb_images],axis=0)
     return logits
 
 def IS(gen_imgs, model, args):
@@ -30,6 +30,9 @@ def IS(gen_imgs, model, args):
         [score]     float, the inception score.
     """
     # E_z[KL(Pyz||Py)] = \mean_z [\sum_y (Pyz log(Pyz) - Pyz log(Py))]
+    if args.cuda:
+        model = model.cuda()
+
     logits = get_logits(gen_imgs,model)
     Pyz = np.exp(logits).transpose() # Take softmax (up to a normalization constant)
     Py = Pyz.mean(-1)                # Average over z
