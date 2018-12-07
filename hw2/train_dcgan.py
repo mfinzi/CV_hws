@@ -15,11 +15,21 @@ class Discriminator(nn.Module):
 
     def __init__(self, args):
         super(Discriminator, self).__init__()
-        raise NotImplementedError()
 
+        self.conv1 = nn.Conv2d(args.nc, args.ndf, 4, 2, 1, bias=False)
+        self.conv2 = nn.Conv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(2 * args.ndf)
+        self.conv3 = nn.Conv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False)
+        self.bn3 = nn.BatchNorm2d(4 * args.ndf)
+        self.conv4 = nn.Conv2d(4 * args.ndf, 1, 4, 1, 0, bias=False)
 
     def forward(self, x):
-        raise NotImplementedError()
+        out = F.leaky_relu(self.conv1(x), .2)
+        out = F.leaky_relu(self.bn2(self.conv2(out)), .2)
+        out = F.leaky_relu(self.bn3(self.conv3(out)), .2)
+        out = F.sigmoid(self.conv4(out))
+
+        return out
 
 
     def load_model(self, filename):
@@ -32,8 +42,8 @@ class Discriminator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        raise NotImplementedError()
-
+        checkpoint = torch.load(filename, map_location='cpu')
+        self.load_state_dict(checkpoint['dnet'])
 
 class Generator(nn.Module):
 
@@ -41,24 +51,23 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.ngf = args.ngf
 
-        self.fc = nn.Linear(args.nz, 4 * args.ngf * 4 * 4)
-        self.fc_bn = nn.BatchNorm2d(4 * args.ngf * 4 * 4)
+        self.proj = nn.Linear(args.nz, 4 * args.ngf * 4 * 4)
+        self.bn0 = nn.BatchNorm2d(4 * args.ngf * 4 * 4)
 
-        self.up_conv1 = nn.ConvTranspose2d(4 * args.ngf, args.ngf * 2, 4, 2, 1, bias=False)
-        self.up_conv1_nb = nn.BatchNorm2d(args.ngf * 2)
+        self.dconv1 = nn.ConvTranspose2d(4 * args.ngf, args.ngf * 2, 4, 2, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(args.ngf * 2)
 
-        self.up_conv2 = nn.ConvTranspose2d(args.ngf * 2, args.ngf, 4, 2, 1, bias=False)
-        self.up_conv2_nb = nn.BatchNorm2d(args.ngf)
+        self.dconv2 = nn.ConvTranspose2d(args.ngf * 2, args.ngf, 4, 2, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(args.ngf)
 
-        self.upconv3 = nn.ConvTranspose2d(args.ngf, args.nc, 4, 2, 1, bias=False)
-        self.up_conv3_nb = nn.BatchNorm2d(args.nc)
+        self.dconv3 = nn.ConvTranspose2d(args.ngf, args.nc, 4, 2, 1, bias=False)
 
     def forward(self, z, c=None):
-        out = F.relu(self.fc_bn(self.fc(z)))
+        out = F.relu(self.bn0(self.proj(z)))
         out = out.view(4 * args.ngf, 4, 4)
-        out = F.relu(self.up_conv1_nb(self.up_conv1(out)))
-        out = F.relu(self.up_conv2_nb(self.up_conv2(out)))
-        out = F.tanh(self.up_conv3_nb(self.up_conv3(out)))
+        out = F.relu(self.bn1(self.dconv1(out)))
+        out = F.relu(self.bn2(self.dconv2(out)))
+        out = F.tanh(self.dconv3(out))
 
         return out
 
@@ -72,7 +81,8 @@ class Generator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        raise NotImplementedError()
+        checkpoint = torch.load(filename, map_location='cpu')
+        self.load_state_dict(checkpoint['gnet'])
 
 
 def d_loss(dreal, dfake):
@@ -141,6 +151,7 @@ if __name__ == "__main__":
 
     d_net = Discriminator(args)
     g_net = Generator(args)
+
     if args.cuda:
         d_net = d_net.cuda()
         g_net = g_net.cuda()
