@@ -26,7 +26,7 @@ def gaussian_kernel(k=3,sigma=.3):
     kernel = np.exp(-(x**2 +y**2)/(2*sigma**2))
     return kernel/kernel.sum()
 
-Dx = lambda: np.array([[-1/2,0,1/2]])
+Dx = lambda: np.array([[1/2,0,-1/2]])
 Dy = lambda: Dx().T
 
 def convolve(*args,**kwargs):
@@ -123,8 +123,101 @@ def compute_mini_sift_desc(img, kp_locs, orientation_norm=False,
         Shape Nxd where d = [num_spatial_bins]x[num_spatial_bins]x[num_ori_bins].
         The default settings hould produce Nx128.
     """
-    raise NotImplementedError()
+    patches = key_points(img,kp_locs,patch_size)
+    feature_vecs = []
+    if orientation_norm == True:
+        list_orientations, list_grad_norm = bin_norm(patches, num_ori_bins)
+    else:
+        list_orientations, list_grad_norm = grad_patches(patches)
+    stride = int(patch_size/num_spatial_bins) #Could cause rounding problems
+    for j, patch in enumerate(patches):
+        grad_norms = list_grad_norm[j]
+        orientations = list_orientations[j]
+        vec = feature_vec(num_spatial_bins, grad_norms, orientations, stride, num_ori_bins)
+        if np.linalg.norm(vec) > 0:
+            vec = vec/np.linalg.norm(vec)
+        feature_vecs.append(vec)
+    return np.array(feature_vecs)
 
+def feature_vec(num_spatial_bin, grad_norms, orientations, stride, num_ori_bins):
+    feature_vec = []
+    radians = 2*np.pi/num_ori_bins
+    bins = np.zeros([num_ori_bins])
+    for s in range(num_spatial_bin):
+        for p in range(num_spatial_bin):
+            gradient_patch = grad_norms[s:(s+1)*stride, p:(p+1)*stride]
+            orientation_patch = orientations[s:(s+1)*stride, p:(p+1)*stride]
+            for i in range(stride):
+                for j in range(stride):
+                    for k in range(num_ori_bins):
+                        if orientations[i,j] < radians * (k-1) and orientations[i,j] < k*radians:
+                            bins[k] += grad_norms[i,j]
+            feature_vec.append(bins)
+
+    return np.array(feature_vec).flatten()
+
+def key_points(img, kp_locs, patch_size):
+    odd = patch_size % 2
+    patches = np.zeros([len(kp_locs),patch_size, patch_size])
+    #Make patch short on edges
+    for i, kp in enumerate(kp_locs):
+        if odd:
+            x_min = kp[1] - (patch_size-1)/2.0
+            x_max = kp[1] + (patch_size+1)/2.0
+            y_min = kp[0] - (patch_size-1)/2.0
+            y_max = kp[0] + (patch_size+1)/2.0
+        else: 
+            x_min = kp[1] - np.round((patch_size)/2.0)
+            x_max = kp[1] + np.trunc((patch_size)/2.0)
+            y_min = kp[0] - np.round((patch_size)/2.0)
+            y_max = kp[0] + np.trunc(patch_size/2.0)
+
+        #patch = utils.crop_patch(img, y_min, x_min, y_max, x_max)
+        patch = utils.crop_patch(img, x_min, y_min, x_max, y_max)
+        patches[i,:,:] = patch
+    return patches
+
+
+def grad(img):
+    x_filter = [[0,0,0],[-1,0,1],[0,0,0]]
+    y_filter = [[0,-1,0],[0,0,0],[0,1,0]]
+    padded_img = utils.pad_image(img, 1,1,1,1)
+    g_x, g_y = convolve(padded_img,Dx()), convolve(padded_img,Dy())
+    orientations = np.arctan2(g_y, g_x)
+    return g_x,g_y, orientations
+
+#def norm_orientation():
+
+def bin_norm(patches, num_ori_bins):
+    radians = 2*np.pi/num_ori_bins
+    bins = np.zeros([num_ori_bins])
+    num_patches = patches.shape[2]
+    list_orientations = []
+    list_grad_norm = []
+    for patch in patches:
+        g_x, g_y, orientations = grad(patch)
+        grad_norm = np.linalg.norm([g_x,g_y], axis = 0)
+        height, width = patch.shape
+        for i in range(height):
+            for j in range(width):
+                for k in range(num_ori_bins):
+                    if orientations[i,j] < radians * (k-1) and orientations[i,j] < k*radians:
+                        bins[k] += grad_norm[i,j]#np.norm([g_x[i,j],g_y[i,j]])
+        max_orientation = np.argmax(bins)
+        orientations += radians*max_orientation
+        list_orientations.append(orientations)
+        list_grad_norm.append(grad_norm)
+    return list_orientations, list_grad_norm
+
+def grad_patches(patches):
+    list_orientations = []
+    list_grad_norm = []
+    for patch in patches:
+        g_x, g_y, orientations = grad(patch)
+        grad_norm = np.linalg.norm([g_x,g_y], axis = 0)
+        list_orientations.append(orientations)
+        list_grad_norm.append(grad_norm)
+    return list_orientations, list_grad_norm
 
 def find_correspondences(pts1, pts2, desc1, desc2, match_score_type='ratio'):
     """Given two list of key-point locations and descriptions, compute the correspondences.
@@ -148,7 +241,12 @@ def find_correspondences(pts1, pts2, desc1, desc2, match_score_type='ratio'):
                                     correspondences [corr[i]]. This will be either SSD or ratio from
                                     the ratio test (i.e. minimum/second_minimum).
     """
-    raise NotImplementedError()
+        X = np.sum(pts1**2, axis=1, keepdims=True)
+        XY = np.sum(pts2**2, axis=1, keepdims=True).T
+        Y = innerproduct(pts1, pts2)
+        L = X + XY - 2*Y
+        D = np.sqrt(np.maximum(L, 0))
+        print(D.shape)
 
 
 def estimate_3D(point1, point2, P1, P2):
@@ -162,8 +260,18 @@ def estimate_3D(point1, point2, P1, P2):
         Return 3D arrary, representing the coordinate of 3D point
         X such that [point1] ~ [P1]X and [point2] ~ [P2]X
     """
-    raise NotImplementedError()
+    A = np.zeros([4,4])
+    #print(P1[2,:]*point1[0])
+    point1
+    A[0,:] = P1[0,:]-P1[2,:]*point1[1]
+    A[1,:] = P1[1,:]-P1[2,:]*point1[0]
 
+    A[2,:] = P2[0,:]-P2[2,:]*point2[1]
+    A[3,:] = P2[1,:]-P2[2,:]*point2[0]
+    _, vecs = np.linalg.eig(A.T @ A)
+    index = np.argsort(_)[0]
+    point = vecs[:,index]
+    return point/float(point[-1])
 
 def estimate_F(corrs):
     """ Eight Point Algorithm with Hartley Normalization.
