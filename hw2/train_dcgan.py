@@ -42,7 +42,7 @@ class Discriminator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        checkpoint = torch.load(filename, map_location='cpu')
+        checkpoint = torch.load(filename)
         self.load_state_dict(checkpoint['dnet'])
 
 class Generator(nn.Module):
@@ -81,7 +81,7 @@ class Generator(nn.Module):
             net.load_model('dcgan.pth.tar')
             # Here [net] should be loaded with weights from file 'dcgan.pth.tar'
         """
-        checkpoint = torch.load(filename, map_location='cpu')
+        checkpoint = torch.load(filename)
         self.load_state_dict(checkpoint['gnet'])
 
 
