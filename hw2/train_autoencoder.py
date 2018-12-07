@@ -73,7 +73,6 @@ class Encoder(nn.Module):
 			# Here [enet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
 		checkpoint = torch.load(filename)
-		print (checkpoint.keys())
 		self.load_state_dict(checkpoint['encoder'])
 
 
@@ -113,8 +112,6 @@ class Decoder(nn.Module):
 			# Here [dnet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
 		checkpoint = torch.load(filename)
-		print (checkpoint.keys())
-
 		self.load_state_dict(checkpoint['decoder'])
 
 
@@ -164,7 +161,7 @@ def sample(model, n, sampler, args):
 	Rets:
 		[imgs]      (n, C, W, H) Float, numpy array.
 	"""
-	images = np.zeros((n, C, W, H))
+	images = np.zeros((n, args.nc, args.image_size, args.image_size))
 
 	completed = 0
 
@@ -174,18 +171,15 @@ def sample(model, n, sampler, args):
 
 		results = model(curr_sample)
 
-		temp_completed = completed + curr_sample
+		temp_completed = completed + args.batch_size
 
-		if completed <= n: 
-			images[completed : temp_completed - 1] = results
+		if temp_completed <= n: 
+			images[completed : temp_completed] = results.detach().cpu().numpy()
+		else:
+			diff = n - completed
+			images[completed:] = results[:diff].detach().cpu().numpy()
+		completed += args.batch_size
 
-
-
-	# for i in range(n):
-	# 	curr_sample = sampler()
-	# 	print (curr_sample)
-	# 	print (curr_sample.size())
-	# 	images[i] = model(curr_sample)
 
 	return images
 
@@ -201,7 +195,6 @@ if __name__ == "__main__":
 	decoder = Decoder(args)
 	encoder = Encoder(args)
 
-
 	if args.cuda:
 		decoder = decoder.cuda()
 		encoder = encoder.cuda()
@@ -212,7 +205,7 @@ if __name__ == "__main__":
 			encoder.parameters(), lr=args.lr_enc, betas=(args.beta_1, args.beta_2))
 
 	step = 0
-	for epoch in range(0):
+	for epoch in range(args.nepoch):
 		print (epoch)
 		for input_data in loader:
 			l = train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=writer)
