@@ -13,11 +13,26 @@ import utils
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        raise NotImplementedError()
+        self.conv1 = nn.Conv2d(1, 6, kernel_size=5, bias=False)
+        self.S2 = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, kernel_size=5, bias=False)
+        self.S4 = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(16*5*5, 120, bias=False)
+        self.fc2 = nn.Linear(120, 84, bias=False)
+        self.fc3 = nn.Linear(84, 10, bias=False)
+
+        self.dropout = nn.Dropout(p=.5)
 
     def forward(self, x):
-        raise NotImplementedError()
-
+        x = F.relu(self.conv1(x))
+        x = self.S2(x)
+        x = F.relu(self.conv2(x))
+        x = self.S4(x)
+        x = x.view(x.size(0), -1)
+        x = self.dropout(self.fc1(x))
+        x = self.dropout(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 def train_batch(x, y, clf, opt, args):
     """Training step for one single batch (one forward, one backward, and one update)
@@ -31,7 +46,25 @@ def train_batch(x, y, clf, opt, args):
         [loss]      (float) Loss of the batch (before update).
         [ncorrect]  (float) Number of correct examples in the batch (before update).
     """
-    raise NotImplementedError()
+    opt.zero_grad()
+    criterion = nn.CrossEntropyLoss()
+    if args.cuda:
+        x = x.cuda()
+        y = y.cuda()
+
+    res = clf(x)
+    ncorrect = 0
+    for i in range(y.size(0)):
+        _, ind = res[i].max(0)
+
+        if torch.equal(y[i], ind):
+            ncorrect +=1
+
+    loss = criterion(res, y)
+    loss.backward()
+    opt.step()
+
+    return loss, ncorrect
 
 
 def evaluate(clf, loader, args):
@@ -46,8 +79,39 @@ def evaluate(clf, loader, args):
             'acc'   : test accuracy
         }
     """
-    raise NotImplementedError()
+    
+    res_dict = {
+    'loss' : 0,
+    'acc' : 0
+    }
+    clf.eval()
 
+    criterion = nn.CrossEntropyLoss()
+    ncorrect = 0.
+    n = 0.
+    for x, y in loader:
+        if args.cuda:
+            x = x.cuda()
+            y = y.cuda()
+        n += float(x.size(0))
+
+        outputs = clf(x)
+
+        for i in range(y.size(0)):
+            _, ind = outputs[i].max(0)
+
+            if torch.equal(y[i], ind):
+                ncorrect +=1
+
+        loss = criterion(outputs, y)
+
+        res_dict['loss'] += loss
+
+    res_dict['loss'] = res_dict['loss']/n
+    res_dict['loss'] = res_dict['loss'][0].item()
+    res_dict['acc'] = ncorrect/n
+    clf.train()
+    return res_dict
 
 def resume_model(filename, args):
     """Resume the training (both model and optimizer) with the checkpoint.
@@ -58,7 +122,17 @@ def resume_model(filename, args):
         [clf]   CNN with weights loaded with the pretrained weights from checkpoint [filename]
         [opt]   Optimizer with parameters resumed from the checkpoint [filename]
     """
-    raise NotImplementedError()
+    checkpoint = torch.load(filename)
+    clf = CNN()
+    clf.load_state_dict(checkpoint['clf'])
+    
+    if args.cuda:
+        clf = clf.cuda()
+
+    opt = torch.optim.Adam(clf.parameters(), lr=1e-3)
+    opt.load_state_dict(checkpoint['opt'])
+
+    return clf, opt
 
 
 ############################################################

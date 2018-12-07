@@ -9,7 +9,9 @@ def convolution(img, kernel, padding='fill'):
         [padding]   Please refer to utils.pad_image
     Rets:
         Shape HxW, image after convolving [kernel] over [img].
+
     """
+    kernel = np.rot90(kernel, 2)
     h,w = kernel.shape[:2]
     t,b,l,r = (h-1)//2, h//2, (w-1)//2, w//2    # Use numpy padding because it works for >2d
     padshape = [(t,b),(l,r)]+[(0,0)]*(len(img.shape[2:]))

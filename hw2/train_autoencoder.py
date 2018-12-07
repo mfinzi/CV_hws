@@ -18,15 +18,20 @@ def recon_loss(g_out, labels, args):
 	Rets:
 		Reconstruction loss with both L1 and L2.
 	"""
-	lam1 = args.recon_l1_weight
-	lam2 = arg.recon_l2_weight
 
-	fst_term = lam2*np.power((g_out - labels), 2)
-	snd_term = lam1*np.absolute(g_out - labels)
+	intermed = g_out - labels
+
+	lam1 = args.recon_l1_weight
+	fst_term = lam1*intermed.abs()
+
+
+	lam2 = args.recon_l2_weight
+	snd_term = lam2*(intermed.pow(2))
+
+	interm_two = fst_term + snd_term
 
 	N = g_out.size()[0]
-	res = (1./N)*np.sum(fst_term + snd_term)
-
+	res = (1./N)*(interm_two.sum())
 	return res
 
 
@@ -37,40 +42,23 @@ class Encoder(nn.Module):
 
 	def __init__(self, args):
 		super(Encoder, self).__init__()
-		
-		self.layer1 = nn.Sequential (
-			nn.Conv2d(in_channels=args.nc, out_channels=args.nef, kernel_size=args.e_ksize, stride=2, padding=1, bias=False),
-			nn.ReLU()
-		)
 
-		self.layer2 = nn.Sequential(
-			nn.Conv2d(in_channels=args.nef, out_channels=args.nef*2, kernel_size=args.e_ksize, stride=2, padding=1, bias=False),
-			nn.BatchNorm2d(args.nef*2),
-			nn.ReLU()
-			)
-
-		self.layer3 = nn.Sequential(
-			nn.Conv2d(in_channels=args.nef*2, out_channels=args.nef*4, kernel_size=args.e_ksize, stride=2, padding=1, bias=False),
-			nn.BatchNorm2d(args.nef*4),
-			nn.ReLU()
-			)
-
-		self.layer4 = nn.Sequential(
-			nn.Conv2d(in_channels=args.nef*4, out_channels=args.nef*8, kernel_size=args.e_ksize, stride=2, padding=1, bias=False),
-			nn.BatchNorm2d(args.nef*8),
-			nn.ReLU()
-			)
-
-		self.layer5 = nn.Linear(args.nef*8, args.nz)
+		self.conv1 = nn.Conv2d(in_channels=args.nc, out_channels=args.nef, kernel_size=args.e_ksize, stride=2, padding=1, bias=False)
+		self.conv2 = nn.Conv2d(in_channels=args.nef, out_channels=args.nef*2, kernel_size=args.e_ksize, stride=2, padding=1, bias=False)
+		self.bn2 = nn.BatchNorm2d(args.nef*2)
+		self.conv3 = nn.Conv2d(in_channels=args.nef*2, out_channels=args.nef*4, kernel_size=args.e_ksize, stride=2, padding=1, bias=False)
+		self.bn3 = nn.BatchNorm2d(args.nef*4)
+		self.conv4 = nn.Conv2d(in_channels=args.nef*4, out_channels=args.nef*8, kernel_size=args.e_ksize, stride=2, padding=1, bias=False)
+		self.bn4 = nn.BatchNorm2d(args.nef*8)
+		self.proj = nn.Linear(args.nef*8*2*2, args.nz)
 
 	def forward(self, x):
-		print (x.size())
-		x = self.layer1(x)
-		x = self.layer2(x)
-		x = self.layer3(x)
-		x = self.layer4(x)
-		print (x.size())
-		x = self.layer5(x)
+		x = F.relu(self.conv1(x))
+		x = F.relu(self.bn2(self.conv2(x)))
+		x = F.relu(self.bn3(self.conv3(x)))
+		x = F.relu(self.bn4(self.conv4(x)))
+		x = x.view(x.size(0), -1)
+		x = self.proj(x)	
 		return x
 
 
@@ -84,7 +72,8 @@ class Encoder(nn.Module):
 			enet.load_model('autoencoder.pth.tar')
 			# Here [enet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
-		self.load_state_dict(torch.load(filename))
+		checkpoint = torch.load(filename)
+		self.load_state_dict(checkpoint['encoder'])
 
 
 
@@ -92,27 +81,24 @@ class Decoder(nn.Module):
 
 	def __init__(self, args):
 		super(Decoder, self).__init__()
-		self.decoder_layers = nn.Sequential(
-			nn.BatchNorm1d(args.nz),
-			nn.Linear(args.nz, args.ngf*4*4),
-			nn.ReLU(),
 
-			nn.ConvTranspose2d(in_channels=args.ngf*4, out_channels=args.ngf*2, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
-			nn.BatchNorm2d(args.ngf*2),
-			nn.ReLU(),
+		self.proj = nn.Linear(args.nz, args.ngf*4*4*4)
+		self.bn0 = nn.BatchNorm1d(args.ngf*4*4*4)
+		self.dconv1 = nn.ConvTranspose2d(in_channels=args.ngf*4, out_channels=args.ngf*2, kernel_size=args.g_ksize, stride=2, padding=1, bias=False)
+		self.bn1 = nn.BatchNorm2d(args.ngf*2)
+		self.dconv2 = nn.ConvTranspose2d(in_channels=args.ngf*2, out_channels=args.ngf, kernel_size=args.g_ksize, stride=2, padding=1, bias=False)
+		self.bn2 = nn.BatchNorm2d(args.ngf)
+		self.dconv3 = nn.ConvTranspose2d(in_channels=args.ngf, out_channels=args.nc, kernel_size=args.g_ksize, stride=2, padding=1, bias=False)
 
-			nn.ConvTranspose2d(in_channels=args.ngf*2, out_channels=args.ngf, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
-			nn.BatchNorm2d(args.ngf),
-			nn.ReLU(),
-
-			nn.ConvTranspose2d(in_channels=args.ngf, out_channels=args.nc, kernel_size=args.g_ksize, stride=2, padding=1, bias=False),
-			nn.Tanh()
-			)
-
-
+		self.reshape_num = args.ngf
 
 	def forward(self, z, c=None):
-		return self.decoder_layers(z)
+		x = F.relu(self.bn0(self.proj(z)))
+		x = x.view(-1,self.reshape_num*4,4,4)
+		x = F.relu(self.bn1(self.dconv1(x)))
+		x = F.relu(self.bn2(self.dconv2(x)))
+		x = F.tanh(self.dconv3(x))
+		return x
 
 
 	def load_model(self, filename):
@@ -125,7 +111,9 @@ class Decoder(nn.Module):
 			dnet.load_model('autoencoder.pth.tar')
 			# Here [dnet] should be loaded with weights from file 'autoencoder.pth.tar'
 		"""
-		self.load_state_dict(torch.load(filename))
+		checkpoint = torch.load(filename)
+		self.load_state_dict(checkpoint['decoder'])
+
 
 
 def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=None):
@@ -142,15 +130,27 @@ def train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=Non
 	Rets:
 		[loss]  (float) Reconstruction loss of the batch (before the update).
 	"""
-	
-	en_res = encoder(input_data[0])
-	de_res = decoder(en_res)
+
+	if args.cuda:
+		input_data[0] = input_data[0].cuda()
+		input_data[1] = input_data[1].cuda()
+
+
 	enc_opt.zero_grad()
 	dec_opt.zero_grad()
+
+	en_res = encoder(input_data[0])
+	de_res = decoder(en_res)
+
+	loss  = recon_loss(de_res, input_data[0], args)
+	loss.backward()
+
 	enc_opt.step()
 	dec_opt.step()
 
-	return recon_loss(de_res, input_data)
+	
+
+	return loss
 
 def sample(model, n, sampler, args):
 	""" Sample [n] images from [model] using noise created by the sampler.
@@ -159,13 +159,27 @@ def sample(model, n, sampler, args):
 		[n]         Number of images to sample.
 		[sampler]   [sampler()] will return a batch of noise.
 	Rets:
-		[imgs]      (B, C, W, H) Float, numpy array.
+		[imgs]      (n, C, W, H) Float, numpy array.
 	"""
-	images = np.zeros((n))
+	images = np.zeros((n, args.nc, args.image_size, args.image_size))
 
-	for i in range(n):
+	completed = 0
+
+	while completed < n:
+
 		curr_sample = sampler()
-		images[i] = model(curr_sample)
+
+		results = model(curr_sample)
+
+		temp_completed = completed + args.batch_size
+
+		if temp_completed <= n: 
+			images[completed : temp_completed] = results.detach().cpu().numpy()
+		else:
+			diff = n - completed
+			images[completed:] = results[:diff].detach().cpu().numpy()
+		completed += args.batch_size
+
 
 	return images
 
@@ -180,6 +194,7 @@ if __name__ == "__main__":
 
 	decoder = Decoder(args)
 	encoder = Encoder(args)
+
 	if args.cuda:
 		decoder = decoder.cuda()
 		encoder = encoder.cuda()
@@ -191,6 +206,7 @@ if __name__ == "__main__":
 
 	step = 0
 	for epoch in range(args.nepoch):
+		print (epoch)
 		for input_data in loader:
 			l = train_batch(input_data, encoder, decoder, enc_opt, dec_opt, args, writer=writer)
 			step += 1

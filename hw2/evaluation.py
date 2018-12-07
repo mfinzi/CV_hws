@@ -8,14 +8,15 @@ import utils
 from scipy.stats import entropy
 from scipy.linalg import norm,sqrtm
 
-def get_logits(imgs,model,bs=32):
+def get_logits(imgs,model,args,bs=32):
     """ Extracts logits from a model, imgs should be numpy array (N, C, W, H),
         and model is the pytorch module on the gpu, returns a numpy array (N, K)
         where K is the number of classes"""
+    to_model_device = (lambda x: x.cuda()) if args.cuda else lambda x:x
     N,C,W,H = imgs.shape
     mb_images = imgs.reshape(N//bs,bs,C,W,H)
-    get_logits = lambda mb: model(torch.from_numpy(mb).cuda()).cpu().data.numpy()
-    logits = np.concatenate([get_logits(minibatch) for minibatch in mb_images],axis=0)
+    get_logits_t = lambda mb: model(to_model_device(torch.from_numpy(mb).float())).cpu().data.numpy()
+    logits = np.concatenate([get_logits_t(minibatch) for minibatch in mb_images],axis=0)
     return logits
 
 def IS(gen_imgs, model, args):
@@ -30,11 +31,12 @@ def IS(gen_imgs, model, args):
         [score]     float, the inception score.
     """
     # E_z[KL(Pyz||Py)] = \mean_z [\sum_y (Pyz log(Pyz) - Pyz log(Py))]
-    logits = get_logits(gen_imgs,model)
+    logits = get_logits(gen_imgs,model,args)
     Pyz = np.exp(logits).transpose() # Take softmax (up to a normalization constant)
-    Py = Pyz.mean(-1)                # Average over z
+    Pyz /= Pyz.sum(0)[None,:]        # divide by normalization constant
+    Py = Pyz.mean(-1)[:,None]        # Average over z
     logIS = entropy(Pyz,Py).mean()   # Average over z
-    raise np.exp(logIS)
+    return np.exp(logIS)
 
 def FID(gen_imgs, gtr_imgs, feat_extr, args, eps=1e-8):
     """ Compute FID scores for [gen_imgs] using [gtr_imgs] as ground truth and
@@ -48,8 +50,8 @@ def FID(gen_imgs, gtr_imgs, feat_extr, args, eps=1e-8):
     Rets:
         [score]     float, the FID score.
     """
-    gen_logits = get_logits(gen_imgs,feat_extr)
-    gtr_logits = get_logits(gtr_imgs,feat_extr)
+    gen_logits = get_logits(gen_imgs,feat_extr,args)
+    gtr_logits = get_logits(gtr_imgs,feat_extr,args)
     mu1 = np.mean(gen_logits,axis=0)
     sigma1 = np.cov(gen_logits, rowvar=False)
     mu2 = np.mean(gtr_logits,axis=0)
