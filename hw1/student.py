@@ -295,21 +295,35 @@ def estimate_F(corrs):
     Rets:
         The estimated F-matrix, which is (3,3) numpy array.
     """
-    centroid = np.zeros(2)
-    N, _ = corrs.shape[0]
-    centroid1[0] = np.mean(corrs[:,0], axis = 1)
-    centroid1[1] = np.mean(corrs[:,1], axis = 1)
+    N, _ = corrs.shape
+    corrs_temp = np.zeros([N,4])
+    corrs_temp[:,1] = corrs[:,0]
+    corrs_temp[:,0] = corrs[:,1]
+    corrs_temp[:,2] = corrs[:,3]
+    corrs_temp[:,3] = corrs[:,2]
+    for i in range(4):
+        mean = np.mean(corrs[:,i])
+        std = np.std(corrs[:,i])
+        corrs[:,i] -= mean
+        corrs[:,i] /= std
+    Y = []
+    for j in range(N):
+        Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
+    Y = np.array(Y)
+    u, s, v = np.linalg.svd(Y)
+    indices = np.argsort(abs(s))
+    if s[-1] != 0:
+        F = v[indices[-1]]#check this because it's second largest
+    else:
+        F = v[indices[-2]]
+    F = F.reshape([3,3])
+    u, s, v = np.linalg.svd(F)
+    s[-1] = 0
+    print(s)
+    #F = u * np.diag(s) * v 
+    #index = np
+    return F
 
-    centroid2[0] = np.mean(corrs[:,2], axis = 1)
-    centroid2[1] = np.mean(corrs[:,3],axis =1)
-
-        +np.sum(corrs[:,3]))/N
-    corrs[:,0] -= centroid[0]
-    corrs[:,2] -= centroid[0]
-    corrs[:,1] -= centroid[1]
-    corrs[:,3] -= centroid[1]
-    dists1 = np.linalg.norm(corrs[:,:2], axis = 1)
-    dists1 = np.linalg.norm(corrs[:,:2], axis = 1)
 
 def sym_epipolar_dist(corr, F):
     """Compute the Symmetrical Epipolar Distance.
