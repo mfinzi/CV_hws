@@ -28,7 +28,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
             in_channels, out_channels, kernel_size, stride=1, padding=0, 
             dilation=1, groups=1, bias=True)
         self.num_iter = num_iter
-        self.u = nn.Parameter(torch.rand(out_channels).cuda())
+        self.u = nn.Parameter(torch.rand(out_channels))
 
 
     def _l2(self, v):
@@ -71,8 +71,8 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         """
         Weight is spectral-normalized at every forward execution while training.
         """
-        # if self.training:
-            # self.spectral_normalize()
+        if self.training:
+            self.spectral_normalize()
         return F.conv2d(input, self.weight.data, self.bias.data, self.stride,
                         self.padding, self.dilation, self.groups)
 
