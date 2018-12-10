@@ -22,37 +22,37 @@ class SpectralNormalizedConv2d(nn.Conv2d):
     Spectral-Normalized 2-D Convolution, using power iteration algorithm.
 
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, num_iter=1):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
+                padding=0, dilation=1, groups=1, bias=True, num_iter=1):
         super(SpectralNormalizedConv2d, self).__init__(
-            in_channels, out_channels, kernel_size, stride=1, padding=0,
+            in_channels, out_channels, kernel_size, stride=1, padding=0, 
             dilation=1, groups=1, bias=True)
-
         self.num_iter = num_iter
         self.u = torch.rand(out_channels)
+
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
 
     def _power_iteration(self, W, u, num_iter):
         """
-        Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.
+        Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
 
         args:
-            num_iter (int): number of iteration to perform
-            u: current estimate of eigenvector
-            W: un-normalized weight (matrix of the subject)
+        num_iter (int): number of iteration to perform
+        u: current estimate of eigenvector 
+        W: un-normalized weight (matrix of the subject) 
 
         """
-        assert num_iter > 0, '[num_iter] must be positive number.'
+        assert num_iter > 0, '[num_iter] must be positive number.' 
 
         for _ in range(num_iter):
             v = self._l2(torch.mv(torch.t(W), u))
             u = self._l2(torch.mv(W, v))
-        s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu
+        s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
 
-        return s, u
-
+        return s, u 
+    
     def spectral_normalize(self):
         """
         See the section 4 second paragraph, footnote [3] of [Spectral Normalization for Generative
@@ -61,11 +61,11 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         the answer will only differ by some predefined K." That is, treating the weight matrix as
         2-D matris of dimension d_out x (d_in*h*w) is valid.
         """
-        weight_temp = self.weight.view(self.weight.size(0), -1)
+        weight_temp = self.weight.view(self.weight.size(0), -1).data
 
-        s, u = self._power_iteration(weight_temp, self.u, self.num_iter)
-        self.u = u
-        self.weight = self.weight / s
+        s, u = self._power_iteration(weight_temp, self.u.data, self.num_iter)
+        self.u.data = u
+        self.weight.data = self.weight.data / s
 
     def forward(self, input):
         """
