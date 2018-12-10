@@ -73,7 +73,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         """
         if self.training:
             self.spectral_normalize()
-        return F.conv2d(input, self.weight, self.bias, self.stride,
+        return F.conv2d(input, self.weight.data, self.bias.data, self.stride,
                         self.padding, self.dilation, self.groups)
 
 
