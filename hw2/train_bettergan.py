@@ -287,7 +287,7 @@ if __name__ == "__main__":
                 input_data, g_net, d_net, g_opt, d_opt, get_z, args, writer=writer)
 
             step += 1
-            print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d, l_g))
+            print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d[0], l_g[0]))
 
     utils.save_checkpoint('dcgan.pth.tar', **{
         'gnet' : g_net.state_dict(),
