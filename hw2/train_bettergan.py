@@ -28,7 +28,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
             in_channels, out_channels, kernel_size, stride=1, padding=0, 
             dilation=1, groups=1, bias=True)
         self.num_iter = num_iter
-        self.u = torch.rand(out_channels)
+        self.u = nn.Parameter(torch.rand(out_channels).cuda())
 
 
     def _l2(self, v):
@@ -49,7 +49,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         for _ in range(num_iter):
             v = self._l2(torch.mv(torch.t(W), u))
             u = self._l2(torch.mv(W, v))
-        s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
+        s = torch.dot(v, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
 
         return s, u 
     
@@ -212,7 +212,7 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
     loss_g = g_loss(dfake, dreal)
-    loss_g.backward()
+    loss_g.backward(torch.ones_like(loss_g))
     g_opt.step()
 
     input_fake = sampler()
