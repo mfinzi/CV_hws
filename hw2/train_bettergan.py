@@ -158,21 +158,6 @@ class Generator(nn.Module):
 #################################################################################################
 #								Losses and Training Functions 	 								#
 #################################################################################################
-
-def d_loss(dreal, dfake):
-    """
-    Args:
-        [dreal]  FloatTensor; The output of D_net from real data.
-                 (already applied sigmoid)
-        [dfake]  FloatTensor; The output of D_net from fake data.
-                 (already applied sigmoid)
-    Rets:
-        DCGAN loss for Discriminator.
-    """
-
-    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
-
-
 def g_loss(dreal, dfake):
     """
     Args:
@@ -184,6 +169,32 @@ def g_loss(dreal, dfake):
         DCGAN loss for Generator.
     """
     return - torch.mean(torch.log(dfake), dim=0)
+
+def d_lsloss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Discriminator.
+    """
+
+    return torch.mean((dreal - 1) ** 2, dim=0) + torch.mean(dfake ** 2, dim=0)
+
+def g_lsloss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Generator.
+    """
+    return torch.mean((1 - dfake) ** 2, dim=0)
+
 
 
 def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=None):
@@ -211,14 +222,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_g = g_loss(dfake, dreal)
+    loss_g = g_loss(dreal,dfake)
     loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_d = d_loss(dfake, dreal)
+    loss_d = d_loss(dreal,dfake)
     loss_d.backward()
     d_opt.step()
 
