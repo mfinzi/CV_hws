@@ -183,8 +183,8 @@ def key_points(img, kp_locs, patch_size):
 def grad(img):
     x_filter = [[0,0,0],[-1,0,1],[0,0,0]]
     y_filter = [[0,-1,0],[0,0,0],[0,1,0]]
-    padded_img = utils.pad_image(img, 1,1,1,1)
-    g_x, g_y = convolve(padded_img,Dx()), convolve(padded_img,Dy())
+    #padded_img = utils.pad_image(img, 1,1,1,1)
+    g_x, g_y = convolve(img,Dx(),'replicate'), convolve(img,Dy(),'replicate')
     orientations = np.arctan2(g_y, g_x)
     return g_x,g_y, orientations
 
@@ -203,10 +203,11 @@ def bin_norm(patches, num_ori_bins):
         for i in range(height):
             for j in range(width):
                 for k in range(num_ori_bins):
-                    if orientations[i,j] < radians * (k-1) and orientations[i,j] < k*radians:
+                    if orientations[i,j] < radians * (k) and orientations[i,j] < (k+1)*radians:
                         bins[k] += grad_norm[i,j]#np.norm([g_x[i,j],g_y[i,j]])
         max_orientation = np.argmax(bins)
-        orientations += radians*max_orientation
+        orientations = (orientations - radians*max_orientation)%(2*np.pi)
+        print(radians*max_orientation)
         list_orientations.append(orientations)
         list_grad_norm.append(grad_norm)
     return list_orientations, list_grad_norm
@@ -243,12 +244,22 @@ def find_correspondences(pts1, pts2, desc1, desc2, match_score_type='ratio'):
                                     correspondences [corr[i]]. This will be either SSD or ratio from
                                     the ratio test (i.e. minimum/second_minimum).
     """
-        X = np.sum(pts1**2, axis=1, keepdims=True)
-        XY = np.sum(pts2**2, axis=1, keepdims=True).T
-        Y = innerproduct(pts1, pts2)
-        L = X + XY - 2*Y
-        D = np.sqrt(np.maximum(L, 0))
-        print(D.shape)
+    N = pts1.shape[0]
+    X = np.sum(desc1**2, axis=1, keepdims=True)
+    Y = np.sum(desc2**2, axis=1, keepdims=True).T
+    XY = np.dot(desc1,desc2.T)
+    L = X + Y - 2*XY
+
+    D = (np.maximum(L, 0))
+    scores = np.min(D, axis = 1)
+    indices = np.argmin(D,axis = 1)
+    corr = []
+    for j,index in enumerate(indices):
+        corr.append(np.hstack([pts1[j],pts2[index]]))
+    if match_score_type=='ratio': 
+        p = np.sort(D, axis = 1)
+        scores = p[:,0]/p[:,1]
+    return np.array(corr), indices, scores
 
 
 def estimate_3D(point1, point2, P1, P2):
@@ -284,8 +295,21 @@ def estimate_F(corrs):
     Rets:
         The estimated F-matrix, which is (3,3) numpy array.
     """
-    raise NotImplementedError()
+    centroid = np.zeros(2)
+    N, _ = corrs.shape[0]
+    centroid1[0] = np.mean(corrs[:,0], axis = 1)
+    centroid1[1] = np.mean(corrs[:,1], axis = 1)
 
+    centroid2[0] = np.mean(corrs[:,2], axis = 1)
+    centroid2[1] = np.mean(corrs[:,3],axis =1)
+
+        +np.sum(corrs[:,3]))/N
+    corrs[:,0] -= centroid[0]
+    corrs[:,2] -= centroid[0]
+    corrs[:,1] -= centroid[1]
+    corrs[:,3] -= centroid[1]
+    dists1 = np.linalg.norm(corrs[:,:2], axis = 1)
+    dists1 = np.linalg.norm(corrs[:,:2], axis = 1)
 
 def sym_epipolar_dist(corr, F):
     """Compute the Symmetrical Epipolar Distance.
