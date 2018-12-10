@@ -219,7 +219,7 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
     loss_d = d_loss(dfake, dreal)
-    loss_d.backward()
+    loss_d.backward(torch.ones_like(loss_d))
     d_opt.step()
 
     return loss_d, loss_g
