@@ -27,10 +27,9 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         super(SpectralNormalizedConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride=1, padding=0, 
             dilation=1, groups=1, bias=True)
-
-            self.num_iter = num_iter
-            self.u = torch.rand(out_channels)
-            self.register_parameter("u", u)
+        self.num_iter = num_iter
+        self.u = torch.rand(out_channels)
+        self.register_parameter("u", u)
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
