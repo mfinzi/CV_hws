@@ -17,19 +17,16 @@ import numpy as np
 #################################################################################################
 #							Spectral-Normalized Convolution Layer 								#
 #################################################################################################
-class SpectralNormalizedConv2d(nn.Conv2d):
+class SpectralNormalization(nn.Module):
     """
     Spectral-Normalized 2-D Convolution, using power iteration algorithm.
 
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
-                padding=0, dilation=1, groups=1, bias=True, num_iter=1):
-        super(SpectralNormalizedConv2d, self).__init__(
-            in_channels, out_channels, kernel_size, stride=1, padding=0, 
-            dilation=1, groups=1, bias=True)
+    def __init__(self, conv, num_iter):
+        super(SpectralNormalization, self).__init__()
+        self.conv = conv
         self.num_iter = num_iter
         self.u = nn.Parameter(torch.rand(out_channels))
-
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
@@ -67,15 +64,15 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         self.u.data = u
         self.weight.data = self.weight.data / s
 
-    def forward(self, input):
+        setattr(self.conv, 'weight', self.weight)
+
+    def forward(self, *args):
         """
         Weight is spectral-normalized at every forward execution while training.
         """
         if self.training:
             self.spectral_normalize()
-        return F.conv2d(input, self.weight, self.bias, self.stride,
-                        self.padding, self.dilation, self.groups)
-
+        return self.conv.forward(*args)
 
 
 #################################################################################################
@@ -87,12 +84,12 @@ class SpectralNormalizedDiscriminator(nn.Module):
     def __init__(self, args):
         super(SpectralNormalizedDiscriminator, self).__init__()
 
-        self.conv1 = SpectralNormalizedConv2d(args.nc, args.ndf, 4, 2, 1, bias=False)
-        self.conv2 = SpectralNormalizedConv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False)
+        self.conv1 = SpectralNormalization(nn.Conv2d(args.nc, args.ndf, 4, 2, 1, bias=False))
+        self.conv2 = SpectralNormalization(nn.Conv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False))
         self.bn2 = nn.BatchNorm2d(2 * args.ndf)
-        self.conv3 = SpectralNormalizedConv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False)
+        self.conv3 = SpectralNormalization(nn.Conv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False))
         self.bn3 = nn.BatchNorm2d(4 * args.ndf)
-        self.conv4 = SpectralNormalizedConv2d(4 * args.ndf, 1, 4, 1, 0, bias=False)
+        self.conv4 = SpectralNormalization(nn.Conv2d(4 * args.ndf, 1, 4, 1, 0, bias=False))
 
     def forward(self, x):
         out = F.leaky_relu(self.conv1(x), .2)
