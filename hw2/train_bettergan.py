@@ -61,11 +61,11 @@ class SpectralNormalizedConv2d(nn.Conv2d):
 		the answer will only differ by some predefined K." That is, treating the weight matrix as 
 		2-D matris of dimension d_out x (d_in*h*w) is valid. 
         """
-		weight_temp = self.weight.view(self.weight.size(0), -1)
+		weight_temp = self.weight.view(self.weight.size(0), -1).data
 
 		s, u = self._power_iteration(weight_temp, self.u, self.num_iter) 
 		self.u = u
-		self.weight = self.weight / s
+		self.weight = self.weight.data / s
 
 	def forward(self, input):
 		"""
