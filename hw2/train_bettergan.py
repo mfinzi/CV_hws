@@ -71,8 +71,8 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         """
         Weight is spectral-normalized at every forward execution while training.
         """
-        if self.training:
-            self.spectral_normalize()
+        # if self.training:
+            # self.spectral_normalize()
         return F.conv2d(input, self.weight.data, self.bias.data, self.stride,
                         self.padding, self.dilation, self.groups)
 
