@@ -212,14 +212,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
     loss_g = g_loss(dfake, dreal)
-    loss_g.backward(torch.ones_like(loss_g))
+    loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
     loss_d = d_loss(dfake, dreal)
-    loss_d.backward(torch.ones_like(loss_d))
+    loss_d.backward()
     d_opt.step()
 
     return loss_d, loss_g
@@ -287,7 +287,7 @@ if __name__ == "__main__":
                 input_data, g_net, d_net, g_opt, d_opt, get_z, args, writer=writer)
 
             step += 1
-            print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d[0], l_g[0]))
+            print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d, l_g))
 
     utils.save_checkpoint('dcgan.pth.tar', **{
         'gnet' : g_net.state_dict(),
