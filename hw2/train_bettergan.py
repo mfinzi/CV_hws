@@ -17,19 +17,17 @@ import numpy as np
 #################################################################################################
 #							Spectral-Normalized Convolution Layer 								#
 #################################################################################################
-class SpectralNormalizedConv2d(nn.Conv2d):
+class SpectralNormalization(nn.Module):
     """
     Spectral-Normalized 2-D Convolution, using power iteration algorithm.
 
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
-                padding=0, dilation=1, groups=1, bias=True, num_iter=1):
-        super(SpectralNormalizedConv2d, self).__init__(
-            in_channels, out_channels, kernel_size, stride=1, padding=0, 
-            dilation=1, groups=1, bias=True)
+    def __init__(self, conv, num_iter=1):
+        super(SpectralNormalization, self).__init__()
+        self.conv = conv
         self.num_iter = num_iter
-        self.u = torch.rand(out_channels)
-
+        self.weight = getattr(self.conv, 'weight')
+        self.u = nn.Parameter(torch.rand(self.weight.size(0)))
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
@@ -49,7 +47,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         for _ in range(num_iter):
             v = self._l2(torch.mv(torch.t(W), u))
             u = self._l2(torch.mv(W, v))
-        s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
+        s = torch.dot(v, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
 
         return s, u 
     
@@ -67,15 +65,15 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         self.u.data = u
         self.weight.data = self.weight.data / s
 
-    def forward(self, input):
+        setattr(self.conv, 'weight', self.weight)
+
+    def forward(self, *args):
         """
         Weight is spectral-normalized at every forward execution while training.
         """
         if self.training:
             self.spectral_normalize()
-        return F.conv2d(input, self.weight, self.bias, self.stride,
-                        self.padding, self.dilation, self.groups)
-
+        return self.conv.forward(*args)
 
 
 #################################################################################################
@@ -87,12 +85,12 @@ class SpectralNormalizedDiscriminator(nn.Module):
     def __init__(self, args):
         super(SpectralNormalizedDiscriminator, self).__init__()
 
-        self.conv1 = SpectralNormalizedConv2d(args.nc, args.ndf, 4, 2, 1, bias=False)
-        self.conv2 = SpectralNormalizedConv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False)
+        self.conv1 = SpectralNormalization(nn.Conv2d(args.nc, args.ndf, 4, 2, 1, bias=False))
+        self.conv2 = SpectralNormalization(nn.Conv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False))
         self.bn2 = nn.BatchNorm2d(2 * args.ndf)
-        self.conv3 = SpectralNormalizedConv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False)
+        self.conv3 = SpectralNormalization(nn.Conv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False))
         self.bn3 = nn.BatchNorm2d(4 * args.ndf)
-        self.conv4 = SpectralNormalizedConv2d(4 * args.ndf, 1, 4, 1, 0, bias=False)
+        self.conv4 = SpectralNormalization(nn.Conv2d(4 * args.ndf, 1, 4, 1, 0, bias=False))
 
     def forward(self, x):
         out = F.leaky_relu(self.conv1(x), .2)
@@ -158,21 +156,6 @@ class Generator(nn.Module):
 #################################################################################################
 #								Losses and Training Functions 	 								#
 #################################################################################################
-
-def d_loss(dreal, dfake):
-    """
-    Args:
-        [dreal]  FloatTensor; The output of D_net from real data.
-                 (already applied sigmoid)
-        [dfake]  FloatTensor; The output of D_net from fake data.
-                 (already applied sigmoid)
-    Rets:
-        DCGAN loss for Discriminator.
-    """
-
-    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
-
-
 def g_loss(dreal, dfake):
     """
     Args:
@@ -184,6 +167,32 @@ def g_loss(dreal, dfake):
         DCGAN loss for Generator.
     """
     return - torch.mean(torch.log(dfake), dim=0)
+
+def d_lsloss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Discriminator.
+    """
+
+    return torch.mean((dreal - 1) ** 2, dim=0) + torch.mean(dfake ** 2, dim=0)
+
+def g_lsloss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Generator.
+    """
+    return torch.mean((1 - dfake) ** 2, dim=0)
+
 
 
 def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=None):
@@ -211,14 +220,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_g = g_loss(dfake, dreal)
+    loss_g = g_lsloss(dreal,dfake)
     loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_d = d_loss(dfake, dreal)
+    loss_d = d_lsloss(dreal,dfake)
     loss_d.backward()
     d_opt.step()
 
