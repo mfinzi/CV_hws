@@ -301,27 +301,35 @@ def estimate_F(corrs):
     corrs_temp[:,0] = corrs[:,1]
     corrs_temp[:,2] = corrs[:,3]
     corrs_temp[:,3] = corrs[:,2]
+    corrs = corrs_temp
     for i in range(4):
         mean = np.mean(corrs[:,i])
         std = np.std(corrs[:,i])
         corrs[:,i] -= mean
-        corrs[:,i] /= std
+        corrs[:,i] /= std * np.sqrt(2)
+
     Y = []
     for j in range(N):
         Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
     Y = np.array(Y)
     u, s, v = np.linalg.svd(Y)
     indices = np.argsort(abs(s))
+    print(u.shape)
+    print('svd norm',np.linalg.norm(v[:,-1]))
+    print('SVD check', np.linalg.norm(u @ np.diag(s) @ v - Y))
+    print('SVD check 2', np.linalg.norm(u @ np.diag(s) @ v.T - Y))
     if s[-1] != 0:
-        F = v[indices[-1]]#check this because it's second largest
+        F = v[:,-1]#check this because it's second largest
     else:
-        F = v[indices[-2]]
+        F = v[:,-2]
     F = F.reshape([3,3])
+    print(F)
     u, s, v = np.linalg.svd(F)
-    s[-1] = 0
     print(s)
-    #F = u * np.diag(s) * v 
+    s[-1] = 0
+    F = u @ np.diag(s) @ v.T
     #index = np
+    F = F/np.linalg.norm(F, order = 'fro')
     return F
 
 
@@ -334,9 +342,8 @@ def sym_epipolar_dist(corr, F):
     Rets:
         Return the symetrical epipolar distance (float)
     """
-    raise NotImplementedError()
-
-
+    #(corr[2:].T @ F @ corr[:2])**2 * (1/(F @ ))
+    pass
 def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
     """ Implement the general RANSAC framework.
     Args:
