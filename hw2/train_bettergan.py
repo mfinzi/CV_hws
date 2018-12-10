@@ -18,41 +18,41 @@ import numpy as np
 #							Spectral-Normalized Convolution Layer 								#
 #################################################################################################
 class SpectralNormalizedConv2d(nn.Conv2d):
-	"""
-	Spectral-Normalized 2-D Convolution, using power iteration algorithm.
+    """
+    Spectral-Normalized 2-D Convolution, using power iteration algorithm.
 
-	"""
-	def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
-				 padding=0, dilation=1, groups=1, bias=True, num_iter=1):
-		super(SpectralNormalizedConv2d, self).__init__(
-			in_channels, out_channels, kernel_size, stride=1, padding=0, 
-			dilation=1, groups=1, bias=True)
+    """
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
+                padding=0, dilation=1, groups=1, bias=True, num_iter=1):
+        super(SpectralNormalizedConv2d, self).__init__(
+            in_channels, out_channels, kernel_size, stride=1, padding=0, 
+            dilation=1, groups=1, bias=True)
 
-		self.num_iter = num_iter
-		self.u = torch.rand(out_channels)
-		self.register_parameter("u", u)
+            self.num_iter = num_iter
+            self.u = torch.rand(out_channels)
+            self.register_parameter("u", u)
 
-	def _l2(self, v):
-		return v / (torch.norm(v, p=2) + 1e-10)
+    def _l2(self, v):
+        return v / (torch.norm(v, p=2) + 1e-10)
 
-	def _power_iteration(self, W, u, num_iter):
-		"""
-		Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
+    def _power_iteration(self, W, u, num_iter):
+    	"""
+    	Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
 
-		args:
-			num_iter (int): number of iteration to perform
-			u: current estimate of eigenvector 
-			W: un-normalized weight (matrix of the subject) 
+    	args:
+    		num_iter (int): number of iteration to perform
+    		u: current estimate of eigenvector 
+    		W: un-normalized weight (matrix of the subject) 
 
-		"""
-		assert num_iter > 0, '[num_iter] must be positive number.' 
+    	"""
+        assert num_iter > 0, '[num_iter] must be positive number.' 
 
-		for _ in range(num_iter):
-			v = self._l2(torch.mv(torch.t(W), u))
-			u = self._l2(torch.mv(W, v))
-		s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
+        for _ in range(num_iter):
+            v = self._l2(torch.mv(torch.t(W), u))
+            u = self._l2(torch.mv(W, v))
+        s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
 
-		return s, u 
+        return s, u 
     
     def spectral_normalize(self):
         """
