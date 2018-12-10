@@ -22,11 +22,12 @@ class SpectralNormalization(nn.Module):
     Spectral-Normalized 2-D Convolution, using power iteration algorithm.
 
     """
-    def __init__(self, conv, num_iter):
+    def __init__(self, conv, num_iter=1):
         super(SpectralNormalization, self).__init__()
         self.conv = conv
         self.num_iter = num_iter
-        self.u = nn.Parameter(torch.rand(out_channels))
+        w = getattr(self.conv, 'weight')
+        self.u = nn.Parameter(torch.rand(w.size(0)))
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
