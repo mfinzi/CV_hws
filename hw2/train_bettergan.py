@@ -85,7 +85,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
 class SpectralNormalizedDiscriminator(nn.Module):
 
     def __init__(self, args):
-        super(Discriminator, self).__init__()
+        super(SpectralNormalizedDiscriminator, self).__init__()
 
         self.conv1 = SpectralNormalizedConv2d(args.nc, args.ndf, 4, 2, 1, bias=False)
         self.conv2 = SpectralNormalizedConv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False)
