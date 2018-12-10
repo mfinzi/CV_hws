@@ -35,15 +35,15 @@ class SpectralNormalizedConv2d(nn.Conv2d):
         return v / (torch.norm(v, p=2) + 1e-10)
 
     def _power_iteration(self, W, u, num_iter):
-    	"""
-    	Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
+        """
+        Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
 
-    	args:
-    		num_iter (int): number of iteration to perform
-    		u: current estimate of eigenvector 
-    		W: un-normalized weight (matrix of the subject) 
+        args:
+        num_iter (int): number of iteration to perform
+        u: current estimate of eigenvector 
+        W: un-normalized weight (matrix of the subject) 
 
-    	"""
+        """
         assert num_iter > 0, '[num_iter] must be positive number.' 
 
         for _ in range(num_iter):
