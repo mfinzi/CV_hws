@@ -30,11 +30,12 @@ class SpectralNormalizedConv2d(nn.Conv2d):
 
 		self.num_iter = num_iter
 		self.u = torch.rand(out_channels)
+		self.register_parameter("u", u)
 
-	def _l2(v):
+	def _l2(self, v):
 		return v / (torch.norm(v, p=2) + 1e-10)
 
-	def _power_iteration(W, u, num_iter):
+	def _power_iteration(self, W, u, num_iter):
 		"""
 		Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
 
@@ -47,8 +48,8 @@ class SpectralNormalizedConv2d(nn.Conv2d):
 		assert num_iter > 0, '[num_iter] must be positive number.' 
 
 		for _ in range(num_iter):
-			v = _l2(torch.mv(torch.t(W), u))
-			u = _l2(torch.mv(W, v))
+			v = self._l2(torch.mv(torch.t(W), u))
+			u = self._l2(torch.mv(W, v))
 		s = torch.dot(u, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
 
 		return s, u 
