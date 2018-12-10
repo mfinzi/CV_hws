@@ -53,7 +53,7 @@ class SpectralNormalizedConv2d(nn.Conv2d):
 
 		return s, u 
 
-	def sepctral_normalize(self):
+	def spectral_normalize(self):
 		"""
 		See the section 4 second paragraph, footnote [3] of [Spectral Normalization for Generative 
 		Adversarial Networks (Miyato et al.)]. "Note that, since we are conducting the convolution 
