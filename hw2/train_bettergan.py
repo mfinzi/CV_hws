@@ -220,14 +220,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_g = g_loss(dreal,dfake)
+    loss_g = g_lsloss(dreal,dfake)
     loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_d = d_loss(dreal,dfake)
+    loss_d = d_lsloss(dreal,dfake)
     loss_d.backward()
     d_opt.step()
 
