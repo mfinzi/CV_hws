@@ -300,32 +300,33 @@ def estimate_F(corrs):
     corrs_temp[:,2] = corrs[:,3]
     corrs_temp[:,3] = corrs[:,2]
     corrs = corrs_temp
+    means = []
+    stds = []
     for i in range(4):
         mean = np.mean(corrs[:,i])
+        means.append(mean)
         std = np.std(corrs[:,i])
+        stds.append(std)
         corrs[:,i] -= mean
         corrs[:,i] /= std
+    T1 = np.array([[1/stds[0], 0, -means[0]/stds[0]],[0,1/stds[1], -means[1]/stds[1]], [0,0,1]])
+    T2 = np.array([[1/stds[2], 0, -means[2]/stds[2]],[0,1/stds[3], -means[3]/stds[3]], [0,0,1]])
     Y = []
     for j in range(N):
-        Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
+        Y.append(np.outer(np.hstack([corrs[j,2:],1]),np.hstack([corrs[j,:2],1])).flatten())
     Y = np.array(Y)
 
-    u, s, v = np.linalg.svd(Y, full_matrices = 1)
-    #print(u @ np.diag(s) @ v.T)
-    #print('svd norm',np.linalg.norm(v[:,-1]))
-    #print('SVD check', np.linalg.norm(u @ np.diag(s) @ v - Y))
-    #print('SVD check 2', np.linalg.norm(u @ np.diag(s) @ v.T - Y))
-    F = v[-1]
-    # if s[-1] != 0:
-    #     F = v[-1]#check this because it's second smallest
-    # else:
-    #     F = v[-2]
-
+    u, s, v = np.linalg.svd(Y, full_matrices = 0)
+    if s[-1] != 0:
+        F = v[-1]
+    else:
+        F = v[-2]
     F = F.reshape([3,3])
     u, s, v = np.linalg.svd(F, full_matrices = 0)
-    s[-1] = 0
-
+    if len(s)==3:
+        s[-1] = 0
     F = u @ np.diag(s) @ v
+    F = T2.T  @  F  @  T1
     F = F/np.linalg.norm(F, ord = 'fro')
     return F
 
@@ -375,17 +376,19 @@ def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
                         for the output model [model], 0 otherwise.
     """
     N,d = data.shape
-    best_score, best_hypothesis = 0, None
+    best_frac, best_hypothesis, best_mask = 0, None, None
     for i in range(num_iter):
         js = np.random.choice(N,size=sample_size,replace=False)
         hypothesis_elements = data[js,:]
         H = hypothesis(hypothesis_elements)
-
-        scores = np.vectorize(metric)(data,H)
-        inlier_frac = (scores<inlier_thresh).mean()
-        if inlier_frac>best_score:
-            best_score, best_hypothesis = inlier_frac, H
-    return H
+        badness = np.array([metric(row,H) for row in data])
+        inlier_mask = (badness<inlier_thresh)
+        inlier_frac = inlier_mask.mean()
+        if inlier_frac>best_frac:
+            best_frac, best_hypothesis, best_mask = inlier_frac,H,inlier_mask
+        # print(H)
+        # print(inlier_mask)
+    return best_hypothesis, best_mask
 
 
 def estimate_F_ransac(corr, num_iter, inlier_thresh):
@@ -401,6 +404,10 @@ def estimate_F_ransac(corr, num_iter, inlier_thresh):
     Rets:
         The estimated F-matrix, which is (3,3) numpy array.
     """
-    raise NotImplementedError()
+    _, inlier_mask = ransac(corr, estimate_F, sym_epipolar_dist, 8, num_iter, inlier_thresh)
+    # inlier_mask = np.ones(9)
+    # inlier_mask[0] = 0
+    F = estimate_F(corr[inlier_mask.astype(np.bool)])
+    return F
 
 
