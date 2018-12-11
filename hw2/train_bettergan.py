@@ -168,6 +168,20 @@ def g_loss(dreal, dfake):
     """
     return - torch.mean(torch.log(dfake), dim=0)
 
+def d_loss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Discriminator.
+    """
+
+    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
+
+
 def d_lsloss(dreal, dfake):
     """
     Args:
