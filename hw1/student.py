@@ -300,17 +300,24 @@ def estimate_F(corrs):
     corrs_temp[:,2] = corrs[:,3]
     corrs_temp[:,3] = corrs[:,2]
     corrs = corrs_temp
+    means = []
+    stds = []
     for i in range(4):
         mean = np.mean(corrs[:,i])
+        means.append(mean)
         std = np.std(corrs[:,i])
+        stds.append(std)
         corrs[:,i] -= mean
         corrs[:,i] /= std
+    T1 = np.array([[1/stds[0], 0, -means[0]/stds[0]],[0,1/stds[1], -means[1]/stds[1]], [0,0,1]])
+    T2 = np.array([[1/stds[2], 0, -means[2]/stds[2]],[0,1/stds[3], -means[3]/stds[3]], [0,0,1]])
+    print(T1)
     Y = []
     for j in range(N):
-        Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
+        Y.append(np.outer(np.hstack([corrs[j,2:],1]),np.hstack([corrs[j,:2],1])).flatten())
     Y = np.array(Y)
 
-    u, s, v = np.linalg.svd(Y, full_matrices = 1)
+    u, s, v = np.linalg.svd(Y, full_matrices = 0)
     #print(u @ np.diag(s) @ v.T)
     #print('svd norm',np.linalg.norm(v[:,-1]))
     #print('SVD check', np.linalg.norm(u @ np.diag(s) @ v - Y))
@@ -322,6 +329,8 @@ def estimate_F(corrs):
     #     F = v[-2]
 
     F = F.reshape([3,3])
+    print(T1.shape)
+    F = T2.T  @  F  @  T1
     u, s, v = np.linalg.svd(F, full_matrices = 0)
     s[-1] = 0
 
