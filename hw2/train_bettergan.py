@@ -47,7 +47,7 @@ class SpectralNormalization(nn.Module):
         for _ in range(num_iter):
             v = self._l2(torch.mv(torch.t(W), u))
             u = self._l2(torch.mv(W, v))
-        s = torch.dot(v, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
+        s = torch.dot(v, torch.mv(torch.t(W), u)) # s = uWu/uu 
 
         return s, u 
     
@@ -63,7 +63,7 @@ class SpectralNormalization(nn.Module):
 
         s, u = self._power_iteration(weight_temp, self.u.data, self.num_iter)
         self.u.data = u
-        self.weight.data = self.weight.data / s
+        self.weight.data = self.weight.data / s.expand_as(self.weight.data)
 
         setattr(self.conv, 'weight', self.weight)
 
