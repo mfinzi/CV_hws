@@ -288,7 +288,7 @@ def resume_model(filename, args):
         [opt]   Optimizer with parameters resumed from the checkpoint [filename]
     """
     checkpoint = torch.load(filename)
-    D = Discriminator(args)
+    D = SpectralNormalizedDiscriminator(args)
     G = Generator(args)
     D.load_state_dict(checkpoint['dnet'])
     G.load_state_dict(checkpoint['gnet'])
