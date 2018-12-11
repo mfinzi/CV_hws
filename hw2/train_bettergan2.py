@@ -1,6 +1,3 @@
-"""
-Implement a generative model that could beat both of the baseline in all metrics.
-"""
 import os
 import torch
 import torch.nn as nn
@@ -14,83 +11,17 @@ import utils
 import numpy as np
 
 
-#################################################################################################
-#							Spectral-Normalized Convolution Layer 								#
-#################################################################################################
-class SpectralNormalization(nn.Module):
-    """
-    Spectral-Normalized 2-D Convolution, using power iteration algorithm.
-
-    """
-    def __init__(self, conv, num_iter=1):
-        super(SpectralNormalization, self).__init__()
-        self.conv = conv
-        self.num_iter = num_iter
-        self.weight = getattr(self.conv, 'weight')
-        self.u = nn.Parameter(torch.rand(self.weight.size(0)))
-
-    def _l2(self, v):
-        return v / (torch.norm(v, p=2) + 1e-10)
-
-    def _power_iteration(self, W, u, num_iter):
-        """
-        Power iteration to efficiently approximate the maximum eigenvalue of the Hessian matrix.  
-
-        args:
-        num_iter (int): number of iteration to perform
-        u: current estimate of eigenvector 
-        W: un-normalized weight (matrix of the subject) 
-
-        """
-        assert num_iter > 0, '[num_iter] must be positive number.' 
-
-        for _ in range(num_iter):
-            v = self._l2(torch.mv(torch.t(W), u))
-            u = self._l2(torch.mv(W, v))
-        s = torch.dot(v, torch.mv(torch.t(W), u)) / torch.dot(u, u) # s = uWu/uu 
-
-        return s, u 
-    
-    def spectral_normalize(self):
-        """
-        See the section 4 second paragraph, footnote [3] of [Spectral Normalization for Generative
-        Adversarial Networks (Miyato et al.)]. "Note that, since we are conducting the convolution
-        discretely, the spectral norm will depend on the size of the stride and padding. However,
-        the answer will only differ by some predefined K." That is, treating the weight matrix as
-        2-D matris of dimension d_out x (d_in*h*w) is valid.
-        """
-        weight_temp = self.weight.view(self.weight.size(0), -1).data
-
-        s, u = self._power_iteration(weight_temp, self.u.data, self.num_iter)
-        self.u.data = u
-        self.weight.data = self.weight.data / s
-
-        setattr(self.conv, 'weight', self.weight)
-
-    def forward(self, *args):
-        """
-        Weight is spectral-normalized at every forward execution while training.
-        """
-        if self.training:
-            self.spectral_normalize()
-        return self.conv.forward(*args)
-
-
-#################################################################################################
-#					   				Deep Convolutional GAN		 								#
-#################################################################################################
-
-class SpectralNormalizedDiscriminator(nn.Module):
+class Discriminator(nn.Module):
 
     def __init__(self, args):
-        super(SpectralNormalizedDiscriminator, self).__init__()
+        super(Discriminator, self).__init__()
 
-        self.conv1 = SpectralNormalization(nn.Conv2d(args.nc, args.ndf, 4, 2, 1, bias=False))
-        self.conv2 = SpectralNormalization(nn.Conv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False))
+        self.conv1 = nn.Conv2d(args.nc, args.ndf, 4, 2, 1, bias=False)
+        self.conv2 = nn.Conv2d(args.ndf, 2 * args.ndf, 4, 2, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(2 * args.ndf)
-        self.conv3 = SpectralNormalization(nn.Conv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False))
+        self.conv3 = nn.Conv2d(2 * args.ndf, 4 * args.ndf, 4, 2, 1, bias=False)
         self.bn3 = nn.BatchNorm2d(4 * args.ndf)
-        self.conv4 = SpectralNormalization(nn.Conv2d(4 * args.ndf, 1, 4, 1, 0, bias=False))
+        self.conv4 = nn.Conv2d(4 * args.ndf, 1, 4, 1, 0, bias=False)
 
     def forward(self, x):
         out = F.leaky_relu(self.conv1(x), .2)
@@ -153,36 +84,7 @@ class Generator(nn.Module):
         checkpoint = torch.load(filename)
         self.load_state_dict(checkpoint['gnet'])
 
-#################################################################################################
-#								Losses and Training Functions 	 								#
-#################################################################################################
-def g_loss(dreal, dfake):
-    """
-    Args:
-        [dreal]  FloatTensor; The output of D_net from real data.
-                 (already applied sigmoid)
-        [dfake]  FloatTensor; The output of D_net from fake data.
-                 (already applied sigmoid)
-    Rets:
-        DCGAN loss for Generator.
-    """
-    return - torch.mean(torch.log(dfake), dim=0)
-
 def d_loss(dreal, dfake):
-    """
-    Args:
-        [dreal]  FloatTensor; The output of D_net from real data.
-                 (already applied sigmoid)
-        [dfake]  FloatTensor; The output of D_net from fake data.
-                 (already applied sigmoid)
-    Rets:
-        DCGAN loss for Discriminator.
-    """
-
-    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
-
-
-def d_lsloss(dreal, dfake):
     """
     Args:
         [dreal]  FloatTensor; The output of D_net from real data.
@@ -195,7 +97,7 @@ def d_lsloss(dreal, dfake):
 
     return torch.mean((dreal - 1) ** 2, dim=0) + torch.mean(dfake ** 2, dim=0)
 
-def g_lsloss(dreal, dfake):
+def g_loss(dreal, dfake):
     """
     Args:
         [dreal]  FloatTensor; The output of D_net from real data.
@@ -206,7 +108,6 @@ def g_lsloss(dreal, dfake):
         DCGAN loss for Generator.
     """
     return torch.mean((1 - dfake) ** 2, dim=0)
-
 
 
 def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=None):
@@ -246,6 +147,7 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     d_opt.step()
 
     return loss_d, loss_g
+
 def sample(model, n, sampler, args):
     """ Sample [n] images from [model] using noise created by the sampler.
     Args:
@@ -277,15 +179,42 @@ def sample(model, n, sampler, args):
     return images
 
 
-#################################################################################################
-#												MAIN  											#
-#################################################################################################
+def resume_model(filename, args):
+    """Resume the training (both model and optimizer) with the checkpoint.
+    Args:
+        [filename]  Str, file name of the checkpoint.
+        [args]      Commandline arguments.
+    Rets:
+        [clf]   CNN with weights loaded with the pretrained weights from checkpoint [filename]
+        [opt]   Optimizer with parameters resumed from the checkpoint [filename]
+    """
+    checkpoint = torch.load(filename)
+    D = Discriminator(args)
+    G = Generator(args)
+    D.load_state_dict(checkpoint['dnet'])
+    G.load_state_dict(checkpoint['gnet'])
+    
+    if args.cuda:
+        G = G.cuda()
+        D = D.cuda()
+
+    opt_gen = torch.optim.Adam(G.parameters(), lr=1e-3)
+    opt_gen.load_state_dict(checkpoint['gopt'])
+
+    opt_disc = torch.optim.Adam(D.parameters(), lr=1e-3)
+    opt_disc.load_state_dict(checkpoint['dopt'])
+
+    return D,G,opt_disc,opt_gen
+
+############################################################
+# DO NOT MODIFY CODES BELOW
+############################################################
 if __name__ == "__main__":
     args = utils.get_args()
     loader = utils.get_loader(args)['train']
     writer = SummaryWriter()
 
-    d_net = SpectralNormalizedDiscriminator(args)
+    d_net = Discriminator(args)
     g_net = Generator(args)
 
     if args.cuda:
@@ -296,6 +225,9 @@ if __name__ == "__main__":
             d_net.parameters(), lr=args.lr_d, betas=(args.beta_1, args.beta_2))
     g_opt = torch.optim.Adam(
             g_net.parameters(), lr=args.lr_g, betas=(args.beta_1, args.beta_2))
+
+    if args.resume:
+        d_net,g_net,d_opt,g_opt = resume_model(args.resume,args)
 
     def get_z():
         z = torch.rand(args.batch_size, args.nz)
@@ -312,7 +244,7 @@ if __name__ == "__main__":
             step += 1
             print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d, l_g))
 
-    utils.save_checkpoint('better_dcgan.pth.tar', **{
+    utils.save_checkpoint('mygan.pth.tar', **{
         'gnet' : g_net.state_dict(),
         'dnet' : d_net.state_dict(),
         'gopt' : g_opt.state_dict(),
@@ -320,6 +252,4 @@ if __name__ == "__main__":
     })
 
     gen_img = sample(g_net, 60000, get_z, args)
-    np.save('better_dcgan_out.npy', gen_img)
-
-
+    np.save('mygan_out.npy', gen_img)
