@@ -333,7 +333,7 @@ if __name__ == "__main__":
         return z
 
     if args.resume:
-        d_net,g_net,d_opt,g_opt = resume_model(args.resume,args)
+        d_net,g_net,d_opt,g_opt = resume_model(args.resume, args)
     step = 0
     for epoch in range(args.nepoch):
         for input_data in loader:
