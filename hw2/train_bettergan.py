@@ -234,14 +234,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_g = g_loss(dreal,dfake)
+    loss_g = g_lsloss(dreal,dfake)
     loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_d = d_loss(dreal,dfake)
+    loss_d = d_lsloss(dreal,dfake)
     loss_d.backward()
     d_opt.step()
 
@@ -277,6 +277,35 @@ def sample(model, n, sampler, args):
     return images
 
 
+
+def resume_model(filename, args):
+    """Resume the training (both model and optimizer) with the checkpoint.
+    Args:
+        [filename]  Str, file name of the checkpoint.
+        [args]      Commandline arguments.
+    Rets:
+        [clf]   CNN with weights loaded with the pretrained weights from checkpoint [filename]
+        [opt]   Optimizer with parameters resumed from the checkpoint [filename]
+    """
+    checkpoint = torch.load(filename)
+    D = Discriminator(args)
+    G = Generator(args)
+    D.load_state_dict(checkpoint['dnet'])
+    G.load_state_dict(checkpoint['gnet'])
+    
+    if args.cuda:
+        G = G.cuda()
+        D = D.cuda()
+
+    opt_gen = torch.optim.Adam(G.parameters(), lr=1e-3)
+    opt_gen.load_state_dict(checkpoint['gopt'])
+
+    opt_disc = torch.optim.Adam(D.parameters(), lr=1e-3)
+    opt_disc.load_state_dict(checkpoint['dopt'])
+
+    return D,G,opt_disc,opt_gen
+
+
 #################################################################################################
 #												MAIN  											#
 #################################################################################################
@@ -303,6 +332,8 @@ if __name__ == "__main__":
             z = z.cuda(async=True)
         return z
 
+    if args.resume:
+        d_net,g_net,d_opt,g_opt = resume_model(args.resume,args)
     step = 0
     for epoch in range(args.nepoch):
         for input_data in loader:
