@@ -337,18 +337,15 @@ def sym_epipolar_dist(corr, F):
     Rets:
         Return the symetrical epipolar distance (float)
     """
-    print(corr)
     corrs_temp = np.zeros(4)
     corrs_temp[1] = corr[0]
     corrs_temp[0] = corr[1]
     corrs_temp[2] = corr[3]
     corrs_temp[3] = corr[2]
     corr = corrs_temp
-    print(corr)
     p1 = np.hstack([corr[:2],1])
     p2 = np.hstack([corr[2:],1])
     first_term = (F @ p1)[:-1]
-    print(p1, p2)
     second_term = (F.T @ p2)[:-1]
     coeff = (p2.T @ F @ p1)**2
 
