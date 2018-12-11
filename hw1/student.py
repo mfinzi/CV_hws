@@ -295,6 +295,7 @@ def estimate_F(corrs):
         The estimated F-matrix, which is (3,3) numpy array.
     """
     N, _ = corrs.shape
+    print(corrs[0,:])
     corrs_temp = np.zeros([N,4])
     corrs_temp[:,1] = corrs[:,0]
     corrs_temp[:,0] = corrs[:,1]
