@@ -168,6 +168,20 @@ def g_loss(dreal, dfake):
     """
     return - torch.mean(torch.log(dfake), dim=0)
 
+def d_loss(dreal, dfake):
+    """
+    Args:
+        [dreal]  FloatTensor; The output of D_net from real data.
+                 (already applied sigmoid)
+        [dfake]  FloatTensor; The output of D_net from fake data.
+                 (already applied sigmoid)
+    Rets:
+        DCGAN loss for Discriminator.
+    """
+
+    return - torch.mean(torch.log(dreal), dim=0) - torch.mean(torch.log(1 - dfake), dim=0)
+
+
 def d_lsloss(dreal, dfake):
     """
     Args:
@@ -220,14 +234,14 @@ def train_batch(input_data, g_net, d_net, g_opt, d_opt, sampler, args, writer=No
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_g = g_lsloss(dreal,dfake)
+    loss_g = g_loss(dreal,dfake)
     loss_g.backward()
     g_opt.step()
 
     input_fake = sampler()
     dfake = d_net(g_net(input_fake))
     dreal = d_net(input_data[0])
-    loss_d = d_lsloss(dreal,dfake)
+    loss_d = d_loss(dreal,dfake)
     loss_d.backward()
     d_opt.step()
 
@@ -298,7 +312,7 @@ if __name__ == "__main__":
             step += 1
             print("Step:%d\tLossD:%2.5f\tLossG:%2.5f"%(step, l_d, l_g))
 
-    utils.save_checkpoint('dcgan.pth.tar', **{
+    utils.save_checkpoint('better_dcgan.pth.tar', **{
         'gnet' : g_net.state_dict(),
         'dnet' : d_net.state_dict(),
         'gopt' : g_opt.state_dict(),
@@ -306,6 +320,6 @@ if __name__ == "__main__":
     })
 
     gen_img = sample(g_net, 60000, get_z, args)
-    np.save('dcgan_out.npy', gen_img)
+    np.save('better_dcgan_out.npy', gen_img)
 
 
