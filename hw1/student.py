@@ -207,7 +207,6 @@ def bin_norm(patches, num_ori_bins):
                         bins[k] += grad_norm[i,j]#np.norm([g_x[i,j],g_y[i,j]])
         max_orientation = np.argmax(bins)
         orientations = (orientations - radians*max_orientation)%(2*np.pi)
-        print(radians*max_orientation)
         list_orientations.append(orientations)
         list_grad_norm.append(grad_norm)
     return list_orientations, list_grad_norm
@@ -302,9 +301,7 @@ def estimate_F(corrs):
     corrs_temp[:,0] = corrs[:,1]
     corrs_temp[:,2] = corrs[:,3]
     corrs_temp[:,3] = corrs[:,2]
-
     corrs = corrs_temp
-
     for i in range(4):
         mean = np.mean(corrs[:,i])
         std = np.std(corrs[:,i])
@@ -314,18 +311,24 @@ def estimate_F(corrs):
     for j in range(N):
         Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
     Y = np.array(Y)
-    u, s, v = np.linalg.svd(Y, full_matrix = 0)
-    indices = np.argsort(abs(s))
-    if s[-1] != 0:
-        F = v[indices[-1]]#check this because it's second largest
-    else:
-        F = v[indices[-2]]
+
+    u, s, v = np.linalg.svd(Y, full_matrices = 1)
+    #print(u @ np.diag(s) @ v.T)
+    #print('svd norm',np.linalg.norm(v[:,-1]))
+    #print('SVD check', np.linalg.norm(u @ np.diag(s) @ v - Y))
+    #print('SVD check 2', np.linalg.norm(u @ np.diag(s) @ v.T - Y))
+    F = v[-1]
+    # if s[-1] != 0:
+    #     F = v[-1]#check this because it's second smallest
+    # else:
+    #     F = v[-2]
+
     F = F.reshape([3,3])
-    u, s, v = np.linalg.svd(F)
+    u, s, v = np.linalg.svd(F, full_matrices = 0)
     s[-1] = 0
-    print(s)
-    F = u * np.diag(s) * v 
-    #index = np
+
+    F = u @ np.diag(s) @ v
+    F = F/np.linalg.norm(F, ord = 'fro')
     return F
 
 
@@ -338,8 +341,19 @@ def sym_epipolar_dist(corr, F):
     Rets:
         Return the symetrical epipolar distance (float)
     """
-    raise NotImplementedError()
+    corrs_temp = np.zeros(4)
+    corrs_temp[1] = corr[0]
+    corrs_temp[0] = corr[1]
+    corrs_temp[2] = corr[3]
+    corrs_temp[3] = corr[2]
+    corr = corrs_temp
+    p1 = np.hstack([corr[:2],1])
+    p2 = np.hstack([corr[2:],1])
+    first_term = (F @ p1)[:-1]
+    second_term = (F.T @ p2)[:-1]
+    coeff = (p2.T @ F @ p1)**2
 
+    return coeff * (1/(np.linalg.norm(first_term)**2) + 1/(np.linalg.norm(second_term)**2))
 
 def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
     """ Implement the general RANSAC framework.
@@ -362,14 +376,14 @@ def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
         [mask]          Mask for inliners. [mask[i]] is 1 if data[i] is an inliner
                         for the output model [model], 0 otherwise.
     """
-    metric = np.vectorize(metric)
     N,d = data.shape
     best_score, best_hypothesis = 0, None
     for i in range(num_iter):
         js = np.random.choice(N,size=sample_size,replace=False)
         hypothesis_elements = data[js,:]
         H = hypothesis(hypothesis_elements)
-        scores = metric(data,H)
+
+        scores = np.vectorize(metric)(data,H)
         inlier_frac = (scores<inlier_thresh).mean()
         if inlier_frac>best_score:
             best_score, best_hypothesis = inlier_frac, H
