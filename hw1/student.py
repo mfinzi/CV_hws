@@ -274,7 +274,6 @@ def estimate_3D(point1, point2, P1, P2):
     """
     A = np.zeros([4,4])
     #print(P1[2,:]*point1[0])
-    point1
     A[0,:] = P1[0,:]-P1[2,:]*point1[1]
     A[1,:] = P1[1,:]-P1[2,:]*point1[0]
 
@@ -295,7 +294,6 @@ def estimate_F(corrs):
         The estimated F-matrix, which is (3,3) numpy array.
     """
     N, _ = corrs.shape
-    print(corrs[0,:])
     corrs_temp = np.zeros([N,4])
     corrs_temp[:,1] = corrs[:,0]
     corrs_temp[:,0] = corrs[:,1]
@@ -311,6 +309,7 @@ def estimate_F(corrs):
     for j in range(N):
         Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
     Y = np.array(Y)
+
     u, s, v = np.linalg.svd(Y, full_matrices = 1)
     #print(u @ np.diag(s) @ v.T)
     #print('svd norm',np.linalg.norm(v[:,-1]))
@@ -321,9 +320,11 @@ def estimate_F(corrs):
     #     F = v[-1]#check this because it's second smallest
     # else:
     #     F = v[-2]
+
     F = F.reshape([3,3])
     u, s, v = np.linalg.svd(F, full_matrices = 0)
     s[-1] = 0
+
     F = u @ np.diag(s) @ v
     F = F/np.linalg.norm(F, ord = 'fro')
     return F
