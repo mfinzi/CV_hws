@@ -274,7 +274,6 @@ def estimate_3D(point1, point2, P1, P2):
     """
     A = np.zeros([4,4])
     #print(P1[2,:]*point1[0])
-    point1
     A[0,:] = P1[0,:]-P1[2,:]*point1[1]
     A[1,:] = P1[1,:]-P1[2,:]*point1[0]
 
@@ -295,7 +294,6 @@ def estimate_F(corrs):
         The estimated F-matrix, which is (3,3) numpy array.
     """
     N, _ = corrs.shape
-    print(corrs[0,:])
     corrs_temp = np.zeros([N,4])
     corrs_temp[:,1] = corrs[:,0]
     corrs_temp[:,0] = corrs[:,1]
