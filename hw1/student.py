@@ -375,16 +375,20 @@ def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
                         for the output model [model], 0 otherwise.
     """
     N,d = data.shape
-    best_score, best_hypothesis = 0, None
+    best_frac, best_hypothesis, best_mask = 0, None, None
     for i in range(num_iter):
         js = np.random.choice(N,size=sample_size,replace=False)
         hypothesis_elements = data[js,:]
+        #print(js)
         H = hypothesis(hypothesis_elements)
-        scores = np.array([metric(row,H) for row in data])
-        inlier_frac = (scores>inlier_thresh).mean()
-        if inlier_frac>best_score:
-            best_score, best_hypothesis = inlier_frac, H
-    return H
+        badness = np.array([metric(row,H) for row in data])
+        #print(badness)
+        inlier_mask = (badness<inlier_thresh)
+        inlier_frac = inlier_mask.mean()
+        #print(inlier_frac)
+        if inlier_frac>best_frac:
+            best_frac, best_hypothesis, best_mask = inlier_frac,H,inlier_mask
+    return best_hypothesis, best_mask
 
 
 def estimate_F_ransac(corr, num_iter, inlier_thresh):
