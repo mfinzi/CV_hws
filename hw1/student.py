@@ -364,7 +364,8 @@ def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
         js = np.random.choice(N,size=sample_size,replace=False)
         hypothesis_elements = data[js,:]
         H = hypothesis(hypothesis_elements)
-        scores = metric(data,H)
+
+        scores = np.vectorize(metric)(data,H)
         inlier_frac = (scores<inlier_thresh).mean()
         if inlier_frac>best_score:
             best_score, best_hypothesis = inlier_frac, H
