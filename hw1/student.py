@@ -358,7 +358,17 @@ def ransac(data, hypothesis, metric, sample_size, num_iter, inlier_thresh):
         [mask]          Mask for inliners. [mask[i]] is 1 if data[i] is an inliner
                         for the output model [model], 0 otherwise.
     """
-    raise NotImplementedError()
+    N,d = data.shape
+    best_score, best_hypothesis = 0, None
+    for i in range(num_iter):
+        js = np.random.choice(N,size=sample_size,replace=False)
+        hypothesis_elements = data[js,:]
+        H = hypothesis(hypothesis_elements)
+        scores = metric(data,H)
+        inlier_frac = (scores<inlier_thresh).mean()
+        if inlier_frac>best_score:
+            best_score, best_hypothesis = inlier_frac, H
+    return H
 
 
 def estimate_F_ransac(corr, num_iter, inlier_thresh):
