@@ -314,7 +314,7 @@ def estimate_F(corrs):
     for j in range(N):
         Y.append(np.outer(np.hstack([corrs[j,:2],1]),np.hstack([corrs[j,2:],1])).flatten())
     Y = np.array(Y)
-    u, s, v = np.linalg.svd(Y)
+    u, s, v = np.linalg.svd(Y, full_matrix = 0)
     indices = np.argsort(abs(s))
     if s[-1] != 0:
         F = v[indices[-1]]#check this because it's second largest
@@ -324,7 +324,7 @@ def estimate_F(corrs):
     u, s, v = np.linalg.svd(F)
     s[-1] = 0
     print(s)
-    #F = u * np.diag(s) * v 
+    F = u * np.diag(s) * v 
     #index = np
     return F
 
