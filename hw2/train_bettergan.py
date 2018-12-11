@@ -27,7 +27,7 @@ class SpectralNormalization(nn.Module):
         self.conv = conv
         self.num_iter = num_iter
         self.weight = getattr(self.conv, 'weight')
-        self.u = torch.rand(self.weight.size(0))
+        self.u = nn.Parameter(torch.rand(self.weight.size(0)))
 
     def _l2(self, v):
         return v / (torch.norm(v, p=2) + 1e-10)
@@ -63,7 +63,7 @@ class SpectralNormalization(nn.Module):
 
         s, u = self._power_iteration(weight_temp, self.u.data, self.num_iter)
         self.u.data = u
-        self.weight /= s.expand_as(self.weight)
+        self.weight.data = self.weight.data / s.expand_as(self.weight.data)
 
         setattr(self.conv, 'weight', self.weight)
 
